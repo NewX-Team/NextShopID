@@ -1,64 +1,48 @@
 import { LoginInput, RegisterInput, AuthResponse } from "@/types/auth";
 
-// Base URL Express API. Fallback ke localhost:5000 jika NEXT_PUBLIC_API_URL belum diset di .env
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
-
+/**
+ * Service Layer Autentikasi Frontend.
+ *
+ * STATUS: STANDALONE (MOCK / SIMULASI).
+ * Belum dihubungkan ke backend Express sesuai arahan.
+ * Frontend berjalan mandiri dengan simulasi delay respons agar interaksi UI
+ * (seperti status loading dan feedback form) tetap bisa diuji coba.
+ */
 export const authService = {
-  /**
-   * Mengirim kredensial login ke backend.
-   * Catatan: Jika nanti backend beralih ke session/HttpOnly cookie,
-   * tambahkan option `credentials: "include"` pada fetch.
-   */
   async login(data: LoginInput): Promise<AuthResponse> {
-    try {
-      const response = await fetch(`${API_URL}/auth/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      });
+    // Simulasi latency jaringan 500ms
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
-      return await response.json();
-    } catch (error) {
-      // Fallback response untuk testing UI saat service Express belum dinyalakan
-      console.warn("[authService.login] API offline, running mock fallback:", error);
-      return {
-        success: true,
-        message: `Simulasi login berhasil (${data.identifier})`,
-      };
-    }
+    console.log("[Mock Auth] Data login diterima:", data);
+
+    return {
+      success: true,
+      message: `Simulasi Login Berhasil!\nSelamat datang, ${data.identifier}`,
+      token: "mock-jwt-token-sample-xyz123",
+      user: {
+        id: 1,
+        name: "Pengguna Demo",
+        username: data.identifier.includes("@") ? "user_demo" : data.identifier,
+        email: data.identifier.includes("@") ? data.identifier : "demo@nextshop.id",
+      },
+    };
   },
 
-  /**
-   * Mendaftarkan pengguna baru.
-   * 'newPassword' di-exclude dari payload karena hanya dipakai untuk validasi form di client.
-   */
   async register(data: RegisterInput): Promise<AuthResponse> {
-    try {
-      // Exclude newPassword dari payload yang dikirim ke backend
-      const payload = {
+    // Simulasi latency jaringan 500ms
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    console.log("[Mock Auth] Data register diterima:", data);
+
+    return {
+      success: true,
+      message: `Simulasi Pendaftaran Berhasil!\nAkun ${data.name} (@${data.username}) berhasil dibuat.`,
+      user: {
+        id: 2,
         name: data.name,
         username: data.username,
         email: data.email,
-        password: data.password,
-      };
-
-      const response = await fetch(`${API_URL}/auth/register`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      return await response.json();
-    } catch (error) {
-      console.warn("[authService.register] API offline, running mock fallback:", error);
-      return {
-        success: true,
-        message: `Simulasi register berhasil untuk @${data.username}`,
-      };
-    }
+      },
+    };
   },
 };

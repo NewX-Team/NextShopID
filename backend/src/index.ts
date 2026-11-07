@@ -1,19 +1,33 @@
-import express, { Request, Response } from 'express';
-import dotenv from 'dotenv';
-import cors from 'cors';
+import express, { Request, Response } from "express";
+import cors from "cors";
+import { ENV } from "./config/env";
+import { initDatabase } from "./config/database";
+import { apiRouter } from "./routes";
 
-dotenv.config();
+// Inisialisasi koneksi SQLite, auto-migrasi tabel, dan seeder admin default
+initDatabase();
 
 const app = express();
-const PORT = process.env.PORT || 5000;
 
+// Global Middlewares
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-app.get('/', (_req: Request, res: Response) => {
-  res.json({ message: 'NextShopID Backend API is running' });
+// Health Check Endpoint
+app.get("/health", (_req: Request, res: Response) => {
+  res.json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    environment: ENV.NODE_ENV,
+  });
 });
 
-app.listen(PORT, () => {
-  console.log(`Backend server is running on http://localhost:${PORT}`);
+// Root API Endpoint
+app.use("/api", apiRouter);
+
+// Start Server
+app.listen(ENV.PORT, () => {
+  console.log(`[NextShopID Backend] Server running on http://localhost:${ENV.PORT}`);
+  console.log(`[NextShopID Backend] API endpoint: http://localhost:${ENV.PORT}/api`);
 });
