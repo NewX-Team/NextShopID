@@ -1,9 +1,8 @@
 import Link from "next/link";
 
-// Halaman utama (Home / Landing page awal)
+// Entry point route (/) - portal navigasi sementara selama fase prototyping
 export default function Home() {
   return (
-    // Box utama di tengah dengan gaya hitam-putih simpel
     <div
       style={{
         maxWidth: "600px",
@@ -14,7 +13,6 @@ export default function Home() {
         backgroundColor: "#fff",
       }}
     >
-      {/* Judul & deskripsi singkat */}
       <h1 style={{ fontSize: "28px", fontWeight: "bold", marginBottom: "12px" }}>
         NextShopID
       </h1>
@@ -22,9 +20,7 @@ export default function Home() {
         Platform E-Commerce NextShopID (Frontend)
       </p>
 
-      {/* Tombol pintas navigasi ke Login dan Register */}
       <div style={{ display: "flex", gap: "12px" }}>
-        {/* Tombol ke Login: warna hitam teks putih */}
         <Link
           href="/login"
           style={{
@@ -39,7 +35,6 @@ export default function Home() {
           Ke Halaman Login
         </Link>
 
-        {/* Tombol ke Register: warna putih teks hitam */}
         <Link
           href="/register"
           style={{
