@@ -20,7 +20,7 @@ function runCommand(command, cwd = rootDir) {
 }
 
 // 1. Setup Environment Variables
-console.log("-> [1/4] Menyiapkan environment variables...");
+console.log("-> [1/5] Menyiapkan environment variables...");
 
 const frontendEnvExample = path.join(frontendDir, ".env.example");
 const frontendEnvLocal = path.join(frontendDir, ".env.local");
@@ -43,14 +43,17 @@ if (!fs.existsSync(backendEnv) && fs.existsSync(backendEnvExample)) {
 }
 
 // 2. Install Dependencies
-console.log("\n-> [2/4] Menginstal dependensi Backend...");
+console.log("\n-> [2/5] Menginstal dependensi Root Workspace (concurrently)...");
+runCommand("npm install", rootDir);
+
+console.log("\n-> [3/5] Menginstal dependensi Backend...");
 runCommand("npm install", backendDir);
 
-console.log("\n-> [3/4] Menginstal dependensi Frontend...");
+console.log("\n-> [4/5] Menginstal dependensi Frontend...");
 runCommand("npm install", frontendDir);
 
 // 3. Build & Inisialisasi Database Backend
-console.log("\n-> [4/4] Membangun backend & inisialisasi SQLite database...");
+console.log("\n-> [5/5] Membangun backend & inisialisasi SQLite database...");
 runCommand("npm run build", backendDir);
 
 // Jalankan seeder database secara otomatis
