@@ -4,6 +4,7 @@
   "private": true,
   "description": "NextShopID Root Workspace",
   "scripts": {
+    "init": "node scripts/init.js",
     "dev": "concurrently -n \"backend,frontend\" -c \"blue,green\" \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "npm run dev --prefix backend",
     "dev:frontend": "npm run dev --prefix frontend",
