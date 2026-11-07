@@ -1,48 +1,126 @@
 import { LoginInput, RegisterInput, AuthResponse } from "@/types/auth";
 
-/**
- * Service Layer Autentikasi Frontend.
- *
- * STATUS: STANDALONE (MOCK / SIMULASI).
- * Belum dihubungkan ke backend Express sesuai arahan.
- * Frontend berjalan mandiri dengan simulasi delay respons agar interaksi UI
- * (seperti status loading dan feedback form) tetap bisa diuji coba.
- */
+// URL dasar API Backend Express
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+
 export const authService = {
+  /**
+   * Mengirim request login ke endpoint POST /api/auth/login di Express
+   */
   async login(data: LoginInput): Promise<AuthResponse> {
-    // Simulasi latency jaringan 500ms
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    try {
+      const response = await fetch(`${API_URL}/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          identifier: data.identifier,
+          password: data.password,
+        }),
+      });
 
-    console.log("[Mock Auth] Data login diterima:", data);
+      const result = await response.json();
 
-    return {
-      success: true,
-      message: `Simulasi Login Berhasil!\nSelamat datang, ${data.identifier}`,
-      token: "mock-jwt-token-sample-xyz123",
-      user: {
-        id: 1,
-        name: "Pengguna Demo",
-        username: data.identifier.includes("@") ? "user_demo" : data.identifier,
-        email: data.identifier.includes("@") ? data.identifier : "demo@nextshop.id",
-      },
-    };
+      if (!response.ok) {
+        return {
+          success: false,
+          message: result.message || "Login gagal, silakan periksa kembali data Anda.",
+        };
+      }
+
+      return {
+        success: true,
+        message: result.message || "Login berhasil.",
+        token: result.token,
+        user: result.user,
+      };
+    } catch (error) {
+      console.error("[authService.login] Gagal memanggil backend Express:", error);
+      return {
+        success: false,
+        message: "Tidak dapat terhubung ke server backend. Pastikan server backend sedang berjalan di http://localhost:5000.",
+      };
+    }
   },
 
+  /**
+   * Mengirim request registrasi user baru ke endpoint POST /api/auth/register di Express
+   */
   async register(data: RegisterInput): Promise<AuthResponse> {
-    // Simulasi latency jaringan 500ms
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    console.log("[Mock Auth] Data register diterima:", data);
-
-    return {
-      success: true,
-      message: `Simulasi Pendaftaran Berhasil!\nAkun ${data.name} (@${data.username}) berhasil dibuat.`,
-      user: {
-        id: 2,
+    try {
+      // Exclude field newPassword (hanya dipakai untuk validasi di sisi client)
+      const payload = {
         name: data.name,
         username: data.username,
         email: data.email,
-      },
-    };
+        password: data.password,
+      };
+
+      const response = await fetch(`${API_URL}/auth/register`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        return {
+          success: false,
+          message: result.message || "Pendaftaran akun gagal.",
+        };
+      }
+
+      return {
+        success: true,
+        message: result.message || "Pendaftaran akun berhasil.",
+        user: result.user,
+      };
+    } catch (error) {
+      console.error("[authService.register] Gagal memanggil backend Express:", error);
+      return {
+        success: false,
+        message: "Tidak dapat terhubung ke server backend. Pastikan server backend sedang berjalan di http://localhost:5000.",
+      };
+    }
+  },
+
+  /**
+   * Mengambil data profil user saat ini (GET /api/auth/me) menggunakan JWT token
+   */
+  async getProfile(token: string): Promise<AuthResponse> {
+    try {
+      const response = await fetch(`${API_URL}/auth/me`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        return {
+          success: false,
+          message: result.message || "Sesi login tidak valid.",
+        };
+      }
+
+      return {
+        success: true,
+        message: "Profil berhasil diambil.",
+        user: result.user,
+      };
+    } catch (error) {
+      console.error("[authService.getProfile] Gagal mengambil profil:", error);
+      return {
+        success: false,
+        message: "Gagal terhubung ke backend.",
+      };
+    }
   },
 };

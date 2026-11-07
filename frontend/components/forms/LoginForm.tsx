@@ -36,15 +36,17 @@ export const LoginForm: React.FC = () => {
     try {
       const response = await authService.login(formData);
 
-      if (response.success) {
-        // TODO: Simpan JWT token (localStorage / Zustand / auth store) jika backend tidak pakai HttpOnly cookie
-        if (response.token) {
-          localStorage.setItem("token", response.token);
+      if (response.success && response.token) {
+        // Simpan token JWT dan objek profil user di localStorage browser
+        localStorage.setItem("token", response.token);
+        if (response.user) {
+          localStorage.setItem("user", JSON.stringify(response.user));
         }
+
         alert(response.message || "Login berhasil!");
         router.push("/");
       } else {
-        setErrorMessage(response.message || "Kredensial tidak valid.");
+        setErrorMessage(response.message || "Kredensial login tidak valid.");
       }
     } catch (err) {
       console.error("[LoginForm] Gagal submit:", err);

@@ -42,14 +42,17 @@ pnpm-debug.log*
 lerna-debug.log*
 
 # Database / SQLite
-data/*.sqlite
-data/*.sqlite-journal
-data/*.db
-*.sqlite
-*.sqlite3
-*.db
+data/*.sqlite*
+data/*.db*
+*.sqlite*
+*.sqlite3*
+*.db*
 *.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
 *.db-journal
+*.db-wal
+*.db-shm
 
 # Testing & Coverage
 coverage/

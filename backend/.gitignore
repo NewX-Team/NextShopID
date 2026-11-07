@@ -10,15 +10,18 @@ dist/
 !.env.example
 !.env*.example
 
-# Database (SQLite & SQLite journals)
-data/*.sqlite
-data/*.sqlite-journal
-data/*.db
-*.sqlite
-*.sqlite3
-*.db
+# Database (SQLite & SQLite journals/WAL)
+data/*.sqlite*
+data/*.db*
+*.sqlite*
+*.sqlite3*
+*.db*
 *.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
 *.db-journal
+*.db-wal
+*.db-shm
 
 # Logs
 logs/
