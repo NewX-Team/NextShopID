@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 
 export default function RegisterPage() {
   return (
-    <main className="flex flex-1 items-center justify-center px-4 py-8 sm:py-12 bg-white">
+    <main className="flex flex-1 items-center justify-center px-4 py-8 sm:py-12 bg-white dark:bg-[#0b0f19] transition-colors duration-200">
       <AuthCard initialMode="register" />
     </main>
   );

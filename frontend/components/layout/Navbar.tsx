@@ -12,9 +12,13 @@ import {
   SettingsIcon,
   LogoutIcon,
   PackageIcon,
+  ShieldIcon,
+  SunIcon,
+  MoonIcon,
 } from "@/components/ui/icons";
 import { SearchModal } from "./SearchModal";
 import { useAuth } from "@/context/AuthContext";
+import { useTheme } from "@/context/ThemeContext";
 
 interface NavbarProps {
   cartItemCount?: number;
@@ -32,6 +36,7 @@ const NAV_ITEMS = [
 export const Navbar: React.FC<NavbarProps> = ({ cartItemCount = 0 }) => {
   const pathname = usePathname();
   const { user, isAuthenticated, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -39,6 +44,9 @@ export const Navbar: React.FC<NavbarProps> = ({ cartItemCount = 0 }) => {
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
 
   const profileDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Khusus halaman privat Admin & Penjual: Tanpa Navbar sama sekali (kanvas putih kosong)
+  const isPrivatePanel = pathname?.startsWith("/admin") || pathname?.startsWith("/penjual");
 
   // Sinkronkan activeMenu secara reaktif berdasarkan URL route saat ini
   const activeMenu = useMemo(() => {
@@ -147,13 +155,18 @@ export const Navbar: React.FC<NavbarProps> = ({ cartItemCount = 0 }) => {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  // Khusus halaman privat Admin & Penjual: Tidak me-render Navbar sama sekali (kanvas putih kosong)
+  if (isPrivatePanel) {
+    return null;
+  }
+
   return (
     <>
       <header
-        className={`sticky top-0 z-40 w-full transition-all duration-300 ease-out ${
+        className={`sticky top-0 z-40 w-full transition-all duration-300 ease-out border-b ${
           isScrolled
-            ? "border-b border-slate-200/80 bg-white/95 backdrop-blur-md shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] py-0"
-            : "border-b border-slate-100 bg-white/90 backdrop-blur-xs py-0.5"
+            ? "border-slate-200/80 bg-white/95 dark:border-white/10 dark:bg-[#0b0f19]/95 backdrop-blur-md shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_20px_-4px_rgba(0,0,0,0.3)] py-0"
+            : "border-slate-100 bg-white/90 dark:border-white/10 dark:bg-[#0b0f19]/90 backdrop-blur-xs py-0.5"
         }`}
       >
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 sm:gap-6 px-4 sm:px-6 lg:px-8">
@@ -164,23 +177,26 @@ export const Navbar: React.FC<NavbarProps> = ({ cartItemCount = 0 }) => {
             {/* Logo NextShopID: Navigasi Cepat ke Beranda */}
             <Link
               href="/"
-              className="group flex items-center text-[19px] font-bold tracking-tight text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/10 rounded-lg py-1 px-1 transition-opacity hover:opacity-90"
+              className="group flex items-center text-[19px] font-bold tracking-tight text-slate-900 dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/10 rounded-lg py-1 px-1 transition-opacity hover:opacity-90"
               aria-label="NextShopID Beranda"
             >
               <span className="transition-transform duration-200 ease-out group-hover:-translate-x-0.5">
                 NextShop
               </span>
-              <span className="text-blue-600 font-bold transition-colors duration-200 group-hover:text-blue-700 ml-0.5">
+              <span className="text-blue-600 dark:text-blue-500 font-bold transition-colors duration-200 group-hover:text-blue-700 ml-0.5">
                 ID
               </span>
             </Link>
 
-            {/* Container Utama Navigasi: Obsidian Dark Navy Pill (#0b132b) dengan Presisi Padding & Gap Seimbang */}
+            {/* Container Utama Navigasi:
+                - Tema Light: Abu-abu terang (#e9edf5) selaras dengan background putih
+                - Tema Dark: Navy gelap (#0b132b) selaras dengan background hitam/gelap
+            */}
             <nav
-              className="relative hidden md:inline-flex items-center p-1.5 px-3.5 gap-1 rounded-full bg-[#0b132b] border border-white/10 shadow-[0_4px_24px_-4px_rgba(11,19,43,0.3),inset_0_1px_1px_rgba(255,255,255,0.08)]"
+              className="relative hidden md:inline-flex items-center p-1.5 px-3.5 gap-1 rounded-full bg-[#e9edf5] dark:bg-[#0b132b] border border-slate-300/70 dark:border-white/10 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03),0_2px_12px_-2px_rgba(0,0,0,0.05)] dark:shadow-[0_4px_24px_-4px_rgba(11,19,43,0.3),inset_0_1px_1px_rgba(255,255,255,0.08)] transition-colors duration-200"
               aria-label="Navigasi Utama"
             >
-              {/* Bulatan Fisik Glider: Royal Sapphire Gradient yang Meluncur Mulus mengikuti Route Aktif */}
+              {/* Bulatan Fisik Glider: Tetap Navy Terang (Royal Sapphire) di Tema Gelap MAUPUN Terang */}
               <div
                 className={`absolute left-0 rounded-full bg-gradient-to-b from-blue-500 to-blue-600 border-t border-white/30 border-x border-b border-blue-600/50 shadow-[0_2px_12px_rgba(37,99,235,0.45),0_0_12px_rgba(37,99,235,0.2)] transition-all duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] pointer-events-none ${
                   gliderStyle.isReady ? "opacity-100" : "opacity-0"
@@ -214,8 +230,8 @@ export const Navbar: React.FC<NavbarProps> = ({ cartItemCount = 0 }) => {
                           ? "text-amber-200 font-semibold drop-shadow-[0_1px_2px_rgba(0,0,0,0.3)]"
                           : "text-white font-semibold drop-shadow-[0_1px_2px_rgba(0,0,0,0.25)]"
                         : isPromo
-                        ? "text-amber-300 hover:text-amber-200 font-semibold"
-                        : "text-slate-300 hover:text-white"
+                        ? "text-amber-600 hover:text-amber-700 dark:text-amber-300 dark:hover:text-amber-200 font-semibold"
+                        : "text-slate-600 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white"
                     }`}
                   >
                     <span>{item.label}</span>
@@ -230,29 +246,29 @@ export const Navbar: React.FC<NavbarProps> = ({ cartItemCount = 0 }) => {
             <button
               type="button"
               onClick={() => setIsSearchOpen(true)}
-              className="group relative flex items-center w-full rounded-full border border-slate-200/80 bg-slate-50/80 px-4 py-2 text-left text-sm text-slate-400 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] transition-all duration-200 hover:border-slate-300 hover:bg-white hover:text-slate-600 hover:shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/10 active:scale-[0.99]"
+              className="group relative flex items-center w-full rounded-full border border-slate-200/80 bg-slate-50/80 dark:border-white/10 dark:bg-slate-900/80 px-4 py-2 text-left text-sm text-slate-400 dark:text-slate-400 shadow-[inset_0_1px_2px_rgba(0,0,0,0.03)] transition-all duration-200 hover:border-slate-300 hover:bg-white hover:text-slate-600 dark:hover:border-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200 hover:shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/10 active:scale-[0.99]"
               aria-label="Buka pencarian cepat (Command + K)"
             >
-              <span className="mr-2.5 text-slate-400 transition-colors duration-150 group-hover:text-slate-600">
+              <span className="mr-2.5 text-slate-400 dark:text-slate-500 transition-colors duration-150 group-hover:text-slate-600 dark:group-hover:text-slate-300">
                 <SearchIcon size={16} />
               </span>
               <span className="flex-1 truncate text-[13px] font-normal">
                 Cari produk, kategori, atau brand...
               </span>
-              <kbd className="hidden sm:inline-flex items-center gap-0.5 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-mono text-slate-400 shadow-2xs transition-colors duration-150 group-hover:border-slate-300 group-hover:text-slate-600">
+              <kbd className="hidden sm:inline-flex items-center gap-0.5 rounded-full border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-800 px-2 py-0.5 text-[10px] font-mono text-slate-400 dark:text-slate-400 shadow-2xs transition-colors duration-150 group-hover:border-slate-300 group-hover:text-slate-600 dark:group-hover:text-slate-200">
                 ⌘K
               </kbd>
             </button>
           </div>
 
-          {/* Sisi Kanan: Search Mobile Trigger, Cart, Auth Status (Login/Register ATAU Profile Dropdown) */}
-          <div className="flex items-center gap-1 sm:gap-3">
+          {/* Sisi Kanan: Search Mobile Trigger, Cart, Theme Toggle, Auth Status (Login/Register ATAU Profile Dropdown) */}
+          <div className="flex items-center gap-1 sm:gap-2.5">
             
             {/* Search Trigger Khusus Layar Ponsel */}
             <button
               type="button"
               onClick={() => setIsSearchOpen(true)}
-              className="flex sm:hidden h-9 w-9 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100 active:scale-95 transition-all"
+              className="flex sm:hidden h-9 w-9 items-center justify-center rounded-full text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 active:scale-95 transition-all"
               aria-label="Pencarian"
             >
               <SearchIcon size={18} />
@@ -262,7 +278,7 @@ export const Navbar: React.FC<NavbarProps> = ({ cartItemCount = 0 }) => {
             <div className="relative group">
               <Link
                 href="/cart"
-                className="relative flex h-10 w-10 items-center justify-center rounded-full text-slate-700 transition-all duration-200 hover:bg-slate-100/80 hover:text-slate-950 active:scale-95"
+                className="relative flex h-10 w-10 items-center justify-center rounded-full text-slate-700 dark:text-slate-300 transition-all duration-200 hover:bg-slate-100/80 hover:text-slate-950 dark:hover:bg-white/10 dark:hover:text-white active:scale-95"
                 aria-label="Keranjang Belanja"
               >
                 <CartIcon
@@ -278,24 +294,24 @@ export const Navbar: React.FC<NavbarProps> = ({ cartItemCount = 0 }) => {
               </Link>
 
               {/* Micro-interaction: Mini Bag Peek on Hover (Desktop Only) */}
-              <div className="pointer-events-none absolute right-0 top-full pt-2 opacity-0 -translate-y-1 transition-all duration-200 ease-out group-hover:pointer-events-auto group-hover:opacity-100 group-hover:translate-y-0 hidden sm:block">
-                <div className="w-64 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xl ring-1 ring-slate-900/5">
-                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              <div className="pointer-events-none absolute right-0 top-full pt-2 opacity-0 -translate-y-1 transition-all duration-200 ease-out group-hover:pointer-events-auto group-hover:opacity-100 group-hover:translate-y-0 hidden sm:block z-50">
+                <div className="w-64 rounded-2xl border border-slate-200/90 bg-white dark:border-white/10 dark:bg-slate-900 p-4 shadow-xl ring-1 ring-slate-900/5">
+                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 dark:border-white/10">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                       Keranjang
                     </span>
                     <span className="text-xs font-medium text-slate-400">
                       {cartItemCount} item
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500 py-2">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 py-2">
                     {cartItemCount === 0
                       ? "Keranjang belanja Anda masih kosong."
                       : `${cartItemCount} produk siap di-checkout.`}
                   </p>
                   <Link
                     href="/cart"
-                    className="mt-2 block w-full rounded-full bg-[#0b132b] py-2 text-center text-xs font-medium text-white transition-colors hover:bg-slate-800 shadow-xs"
+                    className="mt-2 block w-full rounded-full bg-blue-600 hover:bg-blue-700 py-2 text-center text-xs font-medium text-white transition-colors shadow-xs"
                   >
                     Lihat Keranjang
                   </Link>
@@ -303,8 +319,23 @@ export const Navbar: React.FC<NavbarProps> = ({ cartItemCount = 0 }) => {
               </div>
             </div>
 
+            {/* Tombol Pengalih Tema: Light / Dark Mode Toggle */}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="relative flex h-10 w-10 items-center justify-center rounded-full text-slate-700 transition-all duration-200 hover:bg-slate-100/80 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white active:scale-95 cursor-pointer"
+              aria-label={theme === "dark" ? "Ganti ke Mode Terang (Light)" : "Ganti ke Mode Gelap (Dark)"}
+              title={theme === "dark" ? "Mode Terang" : "Mode Gelap"}
+            >
+              {theme === "dark" ? (
+                <SunIcon size={19} className="text-amber-400 transition-transform duration-300 rotate-0 hover:rotate-45" />
+              ) : (
+                <MoonIcon size={18} className="text-slate-700 transition-transform duration-300 rotate-0 hover:-rotate-12" />
+              )}
+            </button>
+
             {/* Divider Halus */}
-            <span className="hidden sm:inline-block h-4 w-[1px] bg-slate-200/80 mx-1" aria-hidden="true" />
+            <span className="hidden sm:inline-block h-4 w-[1px] bg-slate-200/80 dark:bg-white/15 mx-0.5" aria-hidden="true" />
 
             {/* KONDISIONAL: Jika Sudah Login -> Tampilkan Bulatan Avatar Profile dengan Dropdown Menu */}
             {isAuthenticated ? (
@@ -312,7 +343,7 @@ export const Navbar: React.FC<NavbarProps> = ({ cartItemCount = 0 }) => {
                 <button
                   type="button"
                   onClick={() => setIsProfileDropdownOpen((prev) => !prev)}
-                  className="group relative flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full bg-gradient-to-tr from-[#0b132b] to-slate-800 text-white font-semibold text-sm shadow-[0_2px_10px_rgba(11,19,43,0.25)] border-2 border-white ring-1 ring-slate-900/10 transition-all duration-200 hover:ring-2 hover:ring-blue-500/50 hover:shadow-md active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                  className="group relative flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full bg-gradient-to-tr from-[#0b132b] to-slate-800 text-white font-semibold text-sm shadow-[0_2px_10px_rgba(11,19,43,0.25)] border-2 border-white dark:border-slate-800 ring-1 ring-slate-900/10 transition-all duration-200 hover:ring-2 hover:ring-blue-500/50 hover:shadow-md active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                   aria-label="Menu profil dan akun"
                   aria-expanded={isProfileDropdownOpen}
                   aria-haspopup="true"
@@ -323,7 +354,7 @@ export const Navbar: React.FC<NavbarProps> = ({ cartItemCount = 0 }) => {
 
                   {/* Micro-indicator: Status Online Emerald */}
                   <span
-                    className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-white"
+                    className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-900"
                     aria-hidden="true"
                   />
                 </button>
@@ -331,25 +362,31 @@ export const Navbar: React.FC<NavbarProps> = ({ cartItemCount = 0 }) => {
                 {/* Dropdown Menu Profile & Settings */}
                 {isProfileDropdownOpen && (
                   <div
-                    className="absolute right-0 top-full mt-2.5 w-72 rounded-2xl border border-slate-200/90 bg-white p-2 shadow-[0_12px_40px_-8px_rgba(0,0,0,0.12),0_4px_16px_-4px_rgba(0,0,0,0.06)] ring-1 ring-slate-900/5 animate-in fade-in zoom-in-95 duration-150 z-50"
+                    className="absolute right-0 top-full mt-2.5 w-72 rounded-2xl border border-slate-200/90 bg-white dark:border-white/10 dark:bg-slate-900 p-2 shadow-[0_12px_40px_-8px_rgba(0,0,0,0.12),0_4px_16px_-4px_rgba(0,0,0,0.06)] dark:shadow-[0_12px_40px_-8px_rgba(0,0,0,0.5)] ring-1 ring-slate-900/5 animate-in fade-in zoom-in-95 duration-150 z-50"
                     role="menu"
                     aria-orientation="vertical"
                   >
                     {/* Header Profil User Card */}
-                    <div className="flex items-center gap-3 rounded-xl bg-slate-50/90 p-3 border border-slate-100">
+                    <div className="flex items-center gap-3 rounded-xl bg-slate-50/90 dark:bg-slate-800/80 p-3 border border-slate-100 dark:border-white/5">
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-bold text-sm shadow-xs">
                         {user?.name ? user.name[0]?.toUpperCase() : "U"}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
-                          <p className="truncate text-xs font-semibold text-slate-900">
+                          <p className="truncate text-xs font-semibold text-slate-900 dark:text-white">
                             {user?.name || "User NextShopID"}
                           </p>
-                          <span className="inline-flex items-center rounded-full bg-blue-50 px-1.5 py-0.2 text-[10px] font-medium text-blue-700 border border-blue-200/50">
-                            {user?.role === "admin" ? "Admin" : "Member"}
+                          <span className={`inline-flex items-center rounded-full px-1.5 py-0.2 text-[10px] font-medium border ${
+                            user?.role === "admin"
+                              ? "bg-amber-50 text-amber-700 border-amber-200/60 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60"
+                              : user?.role === "penjual"
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200/60 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60"
+                              : "bg-blue-50 text-blue-700 border-blue-200/50 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800/60"
+                          }`}>
+                            {user?.role === "admin" ? "Admin" : user?.role === "penjual" ? "Penjual" : "Member"}
                           </span>
                         </div>
-                        <p className="truncate text-[11px] text-slate-500 font-mono">
+                        <p className="truncate text-[11px] text-slate-500 dark:text-slate-400 font-mono">
                           {user?.email || `@${user?.username}`}
                         </p>
                       </div>
@@ -357,10 +394,46 @@ export const Navbar: React.FC<NavbarProps> = ({ cartItemCount = 0 }) => {
 
                     {/* Navigasi Profil & Pengaturan */}
                     <div className="py-1">
+                      {/* Shortcut Dashboard Khusus Admin */}
+                      {user?.role === "admin" && (
+                        <Link
+                          href="/admin"
+                          onClick={() => setIsProfileDropdownOpen(false)}
+                          className="group flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-medium text-amber-700 dark:text-amber-300 hover:bg-amber-50/80 dark:hover:bg-amber-950/30 transition-colors"
+                          role="menuitem"
+                        >
+                          <span className="text-amber-600 dark:text-amber-400">
+                            <ShieldIcon size={16} />
+                          </span>
+                          <div className="flex-1">
+                            <span className="block leading-none font-semibold">Dashboard Admin</span>
+                            <span className="text-[10px] text-amber-600/80 dark:text-amber-400/80 font-normal">Panel kontrol sistem</span>
+                          </div>
+                        </Link>
+                      )}
+
+                      {/* Shortcut Dashboard Khusus Penjual */}
+                      {user?.role === "penjual" && (
+                        <Link
+                          href="/penjual"
+                          onClick={() => setIsProfileDropdownOpen(false)}
+                          className="group flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-medium text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50/80 dark:hover:bg-emerald-950/30 transition-colors"
+                          role="menuitem"
+                        >
+                          <span className="text-emerald-600 dark:text-emerald-400">
+                            <PackageIcon size={16} />
+                          </span>
+                          <div className="flex-1">
+                            <span className="block leading-none font-semibold">Dashboard Penjual</span>
+                            <span className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80 font-normal">Panel kelola toko</span>
+                          </div>
+                        </Link>
+                      )}
+
                       <Link
                         href="/profile"
                         onClick={() => setIsProfileDropdownOpen(false)}
-                        className="group flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-medium text-slate-700 transition-colors hover:bg-slate-100/80 hover:text-slate-950"
+                        className="group flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-medium text-slate-700 dark:text-slate-300 transition-colors hover:bg-slate-100/80 dark:hover:bg-white/5 hover:text-slate-950 dark:hover:text-white"
                         role="menuitem"
                       >
                         <span className="text-slate-400 group-hover:text-blue-600 transition-colors">
@@ -375,7 +448,7 @@ export const Navbar: React.FC<NavbarProps> = ({ cartItemCount = 0 }) => {
                       <Link
                         href="/settings"
                         onClick={() => setIsProfileDropdownOpen(false)}
-                        className="group flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-medium text-slate-700 transition-colors hover:bg-slate-100/80 hover:text-slate-950"
+                        className="group flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-medium text-slate-700 dark:text-slate-300 transition-colors hover:bg-slate-100/80 dark:hover:bg-white/5 hover:text-slate-950 dark:hover:text-white"
                         role="menuitem"
                       >
                         <span className="text-slate-400 group-hover:text-blue-600 transition-colors">
@@ -390,7 +463,7 @@ export const Navbar: React.FC<NavbarProps> = ({ cartItemCount = 0 }) => {
                       <Link
                         href="/orders"
                         onClick={() => setIsProfileDropdownOpen(false)}
-                        className="group flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-medium text-slate-700 transition-colors hover:bg-slate-100/80 hover:text-slate-950"
+                        className="group flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-medium text-slate-700 dark:text-slate-300 transition-colors hover:bg-slate-100/80 dark:hover:bg-white/5 hover:text-slate-950 dark:hover:text-white"
                         role="menuitem"
                       >
                         <span className="text-slate-400 group-hover:text-blue-600 transition-colors">
@@ -403,7 +476,7 @@ export const Navbar: React.FC<NavbarProps> = ({ cartItemCount = 0 }) => {
                       </Link>
                     </div>
 
-                    <div className="h-[1px] bg-slate-100 my-1 mx-1" />
+                    <div className="h-[1px] bg-slate-100 dark:bg-white/10 my-1 mx-1" />
 
                     {/* Tombol Logout */}
                     <button
@@ -412,7 +485,7 @@ export const Navbar: React.FC<NavbarProps> = ({ cartItemCount = 0 }) => {
                         setIsProfileDropdownOpen(false);
                         logout();
                       }}
-                      className="group flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-medium text-rose-600 hover:bg-rose-50/80 hover:text-rose-700 transition-colors text-left"
+                      className="group flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50/80 dark:hover:bg-rose-950/30 hover:text-rose-700 dark:hover:text-rose-300 transition-colors text-left"
                       role="menuitem"
                     >
                       <span className="text-rose-500 transition-colors">
@@ -429,16 +502,16 @@ export const Navbar: React.FC<NavbarProps> = ({ cartItemCount = 0 }) => {
                 {/* Editorial Typographic Login Action Link */}
                 <Link
                   href="/login"
-                  className="group relative px-3 py-1.5 text-[13px] font-medium tracking-tight text-slate-700 transition-colors duration-200 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/10 rounded-full hover:bg-slate-100/70"
+                  className="group relative px-3 py-1.5 text-[13px] font-medium tracking-tight text-slate-700 dark:text-slate-300 transition-colors duration-200 hover:text-slate-950 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900/10 rounded-full hover:bg-slate-100/70 dark:hover:bg-white/10"
                 >
                   <span>Login</span>
                   <span className="absolute inset-x-3 bottom-1 h-[1.5px] bg-blue-600 scale-x-0 transition-transform duration-200 ease-out group-hover:scale-x-100 origin-center" />
                 </Link>
 
-                {/* Register Button: Rounded Full Dark Navy (#0b132b) */}
+                {/* Tombol Register: Menggunakan NAVY TERANG di Tema Terang MAUPUN Gelap */}
                 <Link
                   href="/register"
-                  className="inline-flex items-center justify-center rounded-full bg-[#0b132b] px-5 py-2 text-[13px] font-medium tracking-tight text-white shadow-xs border border-white/10 transition-all duration-200 hover:bg-slate-800 hover:shadow-sm active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
+                  className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 px-5 py-2 text-[13px] font-medium tracking-tight text-white shadow-[0_2px_10px_rgba(37,99,235,0.3)] border border-blue-500/40 transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                 >
                   Register
                 </Link>
@@ -449,7 +522,7 @@ export const Navbar: React.FC<NavbarProps> = ({ cartItemCount = 0 }) => {
             <button
               type="button"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="flex h-9 w-9 items-center justify-center rounded-full text-slate-700 hover:bg-slate-100 active:scale-95 transition-all md:hidden ml-1"
+              className="flex h-9 w-9 items-center justify-center rounded-full text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 active:scale-95 transition-all md:hidden ml-1"
               aria-label="Toggle Menu Navigasi"
               aria-expanded={isMobileMenuOpen}
             >
@@ -460,8 +533,8 @@ export const Navbar: React.FC<NavbarProps> = ({ cartItemCount = 0 }) => {
 
         {/* Mobile Navigation Sheet */}
         {isMobileMenuOpen && (
-          <div className="border-t border-slate-100 bg-white/98 backdrop-blur-md px-4 py-4 md:hidden shadow-lg animate-in slide-in-from-top-2 duration-200">
-            <div className="rounded-2xl bg-[#0b132b] p-3 text-white border border-white/10 shadow-lg">
+          <div className="border-t border-slate-100 dark:border-white/10 bg-white/98 dark:bg-[#0b0f19]/98 backdrop-blur-md px-4 py-4 md:hidden shadow-lg animate-in slide-in-from-top-2 duration-200">
+            <div className="rounded-2xl bg-[#e9edf5] dark:bg-[#0b132b] p-3 text-slate-900 dark:text-white border border-slate-300/60 dark:border-white/10 shadow-lg">
               <nav className="flex flex-col gap-1.5">
                 {NAV_ITEMS.map((item) => {
                   const isActive = activeMenu === item.id;
@@ -476,8 +549,8 @@ export const Navbar: React.FC<NavbarProps> = ({ cartItemCount = 0 }) => {
                         isActive
                           ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold shadow-xs"
                           : isPromo
-                          ? "text-amber-300 hover:bg-white/5 font-semibold"
-                          : "text-slate-300 hover:bg-white/5 hover:text-white"
+                          ? "text-amber-600 dark:text-amber-300 hover:bg-white/20 dark:hover:bg-white/5 font-semibold"
+                          : "text-slate-600 dark:text-slate-300 hover:bg-white/20 dark:hover:bg-white/5 hover:text-slate-950 dark:hover:text-white"
                       }`}
                     >
                       <span>{item.label}</span>
@@ -491,20 +564,48 @@ export const Navbar: React.FC<NavbarProps> = ({ cartItemCount = 0 }) => {
 
               {/* Sesi Pengguna di Tampilan Mobile */}
               {isAuthenticated ? (
-                <div className="mt-3 pt-3 border-t border-white/10 flex flex-col gap-1">
-                  <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-white/5 border border-white/10">
+                <div className="mt-3 pt-3 border-t border-slate-300/40 dark:border-white/10 flex flex-col gap-1">
+                  <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-white/40 dark:bg-white/5 border border-slate-300/40 dark:border-white/10">
                     <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 font-bold text-xs text-white">
                       {user?.name ? user.name[0]?.toUpperCase() : "U"}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-semibold text-white">{user?.name}</p>
-                      <p className="truncate text-[10px] text-slate-400 font-mono">{user?.email}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="truncate text-xs font-semibold text-slate-900 dark:text-white">{user?.name}</p>
+                        <span className="text-[10px] px-1 rounded bg-black/5 dark:bg-white/10 text-slate-700 dark:text-slate-300">
+                          {user?.role === "admin" ? "Admin" : user?.role === "penjual" ? "Penjual" : "Member"}
+                        </span>
+                      </div>
+                      <p className="truncate text-[10px] text-slate-500 dark:text-slate-400 font-mono">{user?.email}</p>
                     </div>
                   </div>
+
+                  {user?.role === "admin" && (
+                    <Link
+                      href="/admin"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 rounded-lg hover:bg-white/20 dark:hover:bg-white/5"
+                    >
+                      <ShieldIcon size={16} />
+                      <span>Dashboard Admin</span>
+                    </Link>
+                  )}
+
+                  {user?.role === "penjual" && (
+                    <Link
+                      href="/penjual"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 rounded-lg hover:bg-white/20 dark:hover:bg-white/5"
+                    >
+                      <PackageIcon size={16} />
+                      <span>Dashboard Penjual</span>
+                    </Link>
+                  )}
+
                   <Link
                     href="/profile"
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-300 hover:text-white rounded-lg hover:bg-white/5"
+                    className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white rounded-lg hover:bg-white/20 dark:hover:bg-white/5"
                   >
                     <UserIcon size={16} />
                     <span>Profil Saya</span>
@@ -512,7 +613,7 @@ export const Navbar: React.FC<NavbarProps> = ({ cartItemCount = 0 }) => {
                   <Link
                     href="/settings"
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-300 hover:text-white rounded-lg hover:bg-white/5"
+                    className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white rounded-lg hover:bg-white/20 dark:hover:bg-white/5"
                   >
                     <SettingsIcon size={16} />
                     <span>Pengaturan</span>
@@ -520,7 +621,7 @@ export const Navbar: React.FC<NavbarProps> = ({ cartItemCount = 0 }) => {
                   <Link
                     href="/orders"
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-300 hover:text-white rounded-lg hover:bg-white/5"
+                    className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white rounded-lg hover:bg-white/20 dark:hover:bg-white/5"
                   >
                     <PackageIcon size={16} />
                     <span>Pesanan Saya</span>
@@ -531,25 +632,25 @@ export const Navbar: React.FC<NavbarProps> = ({ cartItemCount = 0 }) => {
                       setIsMobileMenuOpen(false);
                       logout();
                     }}
-                    className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-rose-400 hover:text-rose-300 rounded-lg hover:bg-white/5 text-left"
+                    className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 rounded-lg hover:bg-white/20 dark:hover:bg-white/5 text-left"
                   >
                     <LogoutIcon size={16} />
                     <span>Keluar Akun (Logout)</span>
                   </button>
                 </div>
               ) : (
-                <div className="mt-3 pt-3 border-t border-white/10 flex items-center gap-2">
+                <div className="mt-3 pt-3 border-t border-slate-300/40 dark:border-white/10 flex items-center gap-2">
                   <Link
                     href="/login"
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className="flex-1 rounded-full border border-white/20 py-2 text-center text-xs font-medium text-white hover:bg-white/10"
+                    className="flex-1 rounded-full border border-slate-300 dark:border-white/20 py-2 text-center text-xs font-medium text-slate-700 dark:text-white hover:bg-white/30 dark:hover:bg-white/10"
                   >
                     Login
                   </Link>
                   <Link
                     href="/register"
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className="flex-1 rounded-full bg-blue-600 py-2 text-center text-xs font-medium text-white hover:bg-blue-700"
+                    className="flex-1 rounded-full bg-blue-600 py-2 text-center text-xs font-medium text-white hover:bg-blue-700 shadow-sm"
                   >
                     Register
                   </Link>

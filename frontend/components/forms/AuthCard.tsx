@@ -70,7 +70,15 @@ export const AuthCard: React.FC<AuthCardProps> = ({ initialMode = "login" }) => 
       const response = await authService.login(loginData);
       if (response.success && response.token && response.user) {
         login(response.token, response.user);
-        router.push("/");
+        
+        // Arahkan otomatis ke halaman sesuai role akun
+        if (response.user.role === "admin") {
+          router.push("/admin");
+        } else if (response.user.role === "penjual") {
+          router.push("/penjual");
+        } else {
+          router.push("/");
+        }
       } else {
         setLoginError(response.message || "Kredensial login tidak valid.");
       }
@@ -128,15 +136,18 @@ export const AuthCard: React.FC<AuthCardProps> = ({ initialMode = "login" }) => 
   return (
     <div className="w-full max-w-[480px] mx-auto py-8 px-4">
       
-      {/* Container Utama Auth: Obsidian Dark Navy (#0b132b) Selaras dengan Desain Navbar */}
-      <div className="relative rounded-3xl bg-[#0b132b] border border-white/10 p-6 sm:p-9 shadow-[0_24px_60px_-12px_rgba(11,19,43,0.45),inset_0_1px_1px_rgba(255,255,255,0.08)] backdrop-blur-md">
+      {/* Container Utama Auth:
+          - Tema Light: Abu-abu terang (#e9edf5) selaras dengan background putih
+          - Tema Dark: Navy Gelap (#0b132b) selaras dengan background hitam
+      */}
+      <div className="relative rounded-3xl bg-[#e9edf5] dark:bg-[#0b132b] border border-slate-300/80 dark:border-white/10 p-6 sm:p-9 shadow-[0_24px_60px_-12px_rgba(0,0,0,0.08)] dark:shadow-[0_24px_60px_-12px_rgba(11,19,43,0.45),inset_0_1px_1px_rgba(255,255,255,0.08)] backdrop-blur-md transition-colors duration-200">
         
         {/* Ambient Top Glow Halus */}
         <div className="pointer-events-none absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent" />
 
         {/* Pill Dock Mode Switcher: Geser Antara Login & Register */}
         <div className="flex justify-center mb-7">
-          <div className="relative flex items-center p-1.5 rounded-full bg-slate-900/90 border border-white/10 shadow-inner w-full max-w-[280px]">
+          <div className="relative flex items-center p-1.5 rounded-full bg-white/80 dark:bg-slate-900/90 border border-slate-300/80 dark:border-white/10 shadow-inner w-full max-w-[280px] transition-colors duration-200">
             {/* Glider Biru Royal Sapphire yang Meluncur Mengikuti Mode Aktif */}
             <div
               className="absolute left-1.5 top-1.5 bottom-1.5 w-[calc(50%-6px)] rounded-full bg-gradient-to-b from-blue-500 to-blue-600 border-t border-white/30 border-x border-b border-blue-600/50 shadow-[0_2px_12px_rgba(37,99,235,0.45)] transition-transform duration-400 ease-[cubic-bezier(0.2,0.8,0.2,1)]"
@@ -149,8 +160,8 @@ export const AuthCard: React.FC<AuthCardProps> = ({ initialMode = "login" }) => 
             <button
               type="button"
               onClick={() => switchMode("login")}
-              className={`relative z-10 flex-1 py-1.5 text-center text-[13px] font-semibold tracking-tight transition-colors duration-200 select-none rounded-full ${
-                mode === "login" ? "text-white" : "text-slate-400 hover:text-slate-200"
+              className={`relative z-10 flex-1 py-1.5 text-center text-[13px] font-semibold tracking-tight transition-colors duration-200 select-none rounded-full cursor-pointer ${
+                mode === "login" ? "text-white" : "text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-slate-200"
               }`}
             >
               Login
@@ -159,8 +170,8 @@ export const AuthCard: React.FC<AuthCardProps> = ({ initialMode = "login" }) => 
             <button
               type="button"
               onClick={() => switchMode("register")}
-              className={`relative z-10 flex-1 py-1.5 text-center text-[13px] font-semibold tracking-tight transition-colors duration-200 select-none rounded-full ${
-                mode === "register" ? "text-white" : "text-slate-400 hover:text-slate-200"
+              className={`relative z-10 flex-1 py-1.5 text-center text-[13px] font-semibold tracking-tight transition-colors duration-200 select-none rounded-full cursor-pointer ${
+                mode === "register" ? "text-white" : "text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-slate-200"
               }`}
             >
               Register
@@ -180,19 +191,19 @@ export const AuthCard: React.FC<AuthCardProps> = ({ initialMode = "login" }) => 
             {/* PANEL 1: LOGIN NEXTSHOPID */}
             <div className="w-1/2 flex-shrink-0 px-1 sm:px-2">
               <div className="mb-6">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 px-2.5 py-0.5 text-[11px] font-medium text-blue-400 mb-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 px-2.5 py-0.5 text-[11px] font-medium text-blue-600 dark:text-blue-400 mb-2">
                   <span>Selamat Datang</span>
                 </span>
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
                   Login NextShopID
                 </h1>
-                <p className="text-xs sm:text-sm text-slate-400 mt-1">
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">
                   Masuk ke akun Anda untuk mulai berbelanja dan melacak pesanan.
                 </p>
               </div>
 
               {loginError && (
-                <div className="mb-5 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300">
+                <div className="mb-5 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-600 dark:text-rose-300">
                   {loginError}
                 </div>
               )}
@@ -200,7 +211,7 @@ export const AuthCard: React.FC<AuthCardProps> = ({ initialMode = "login" }) => 
               <form onSubmit={handleLoginSubmit} className="space-y-4">
                 {/* Field Username / Email */}
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                     Username atau Email
                   </label>
                   <div className="relative flex items-center">
@@ -216,7 +227,7 @@ export const AuthCard: React.FC<AuthCardProps> = ({ initialMode = "login" }) => 
                         if (loginError) setLoginError("");
                       }}
                       placeholder="Masukkan username atau email"
-                      className="w-full rounded-xl bg-slate-900/70 border border-white/10 px-4 py-2.5 pl-10 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                      className="w-full rounded-xl bg-white dark:bg-slate-900/70 border border-slate-300 dark:border-white/10 px-4 py-2.5 pl-10 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
                     />
                   </div>
                 </div>
@@ -224,7 +235,7 @@ export const AuthCard: React.FC<AuthCardProps> = ({ initialMode = "login" }) => 
                 {/* Field Password */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-medium text-slate-300">
+                    <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
                       Password
                     </label>
                     <a
@@ -233,7 +244,7 @@ export const AuthCard: React.FC<AuthCardProps> = ({ initialMode = "login" }) => 
                         e.preventDefault();
                         alert("Silakan hubungi administrator untuk mereset password akun demo Anda.");
                       }}
-                      className="text-[11px] text-blue-400 hover:text-blue-300 transition-colors"
+                      className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline transition-colors"
                     >
                       Lupa password?
                     </a>
@@ -251,12 +262,12 @@ export const AuthCard: React.FC<AuthCardProps> = ({ initialMode = "login" }) => 
                         if (loginError) setLoginError("");
                       }}
                       placeholder="Masukkan password"
-                      className="w-full rounded-xl bg-slate-900/70 border border-white/10 px-4 py-2.5 pl-10 pr-10 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                      className="w-full rounded-xl bg-white dark:bg-slate-900/70 border border-slate-300 dark:border-white/10 px-4 py-2.5 pl-10 pr-10 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
                     />
                     <button
                       type="button"
                       onClick={() => setShowLoginPassword((p) => !p)}
-                      className="absolute right-3.5 text-slate-400 hover:text-white transition-colors"
+                      className="absolute right-3.5 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors cursor-pointer"
                       aria-label="Tampilkan atau sembunyikan password"
                     >
                       {showLoginPassword ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
@@ -264,11 +275,11 @@ export const AuthCard: React.FC<AuthCardProps> = ({ initialMode = "login" }) => 
                   </div>
                 </div>
 
-                {/* Tombol Masuk */}
+                {/* Tombol Masuk: Navy Terang di Tema Gelap MAUPUN Terang */}
                 <button
                   type="submit"
                   disabled={isLoginLoading}
-                  className="w-full mt-2 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-600 text-white font-semibold py-3 text-sm shadow-[0_4px_20px_rgba(37,99,235,0.35)] active:scale-[0.98] transition-all disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full mt-2 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-semibold py-3 text-sm shadow-[0_4px_20px_rgba(37,99,235,0.35)] active:scale-[0.98] transition-all disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {isLoginLoading ? (
                     <span>Memverifikasi akun...</span>
@@ -282,13 +293,13 @@ export const AuthCard: React.FC<AuthCardProps> = ({ initialMode = "login" }) => 
               </form>
 
               {/* Tautan Geser ke Register */}
-              <div className="mt-6 pt-5 border-t border-white/10 text-center">
-                <p className="text-xs text-slate-400">
+              <div className="mt-6 pt-5 border-t border-slate-300/60 dark:border-white/10 text-center">
+                <p className="text-xs text-slate-600 dark:text-slate-400">
                   Belum memiliki akun NextShopID?{" "}
                   <button
                     type="button"
                     onClick={() => switchMode("register")}
-                    className="font-semibold text-blue-400 hover:text-blue-300 transition-colors cursor-pointer inline-flex items-center gap-1 ml-0.5"
+                    className="font-semibold text-blue-600 dark:text-blue-400 hover:underline transition-colors cursor-pointer inline-flex items-center gap-1 ml-0.5"
                   >
                     <span>Daftar Akun Baru</span>
                     <span>→</span>
@@ -300,19 +311,19 @@ export const AuthCard: React.FC<AuthCardProps> = ({ initialMode = "login" }) => 
             {/* PANEL 2: REGISTER NEXTSHOPID */}
             <div className="w-1/2 flex-shrink-0 px-1 sm:px-2">
               <div className="mb-6">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 px-2.5 py-0.5 text-[11px] font-medium text-blue-400 mb-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 px-2.5 py-0.5 text-[11px] font-medium text-blue-600 dark:text-blue-400 mb-2">
                   <span>Mulai Berbelanja</span>
                 </span>
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
                   Register NextShopID
                 </h1>
-                <p className="text-xs sm:text-sm text-slate-400 mt-1">
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">
                   Buat akun baru dan nikmati berbagai promo eksklusif.
                 </p>
               </div>
 
               {registerError && (
-                <div className="mb-5 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300">
+                <div className="mb-5 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-600 dark:text-rose-300">
                   {registerError}
                 </div>
               )}
@@ -320,7 +331,7 @@ export const AuthCard: React.FC<AuthCardProps> = ({ initialMode = "login" }) => 
               <form onSubmit={handleRegisterSubmit} className="space-y-3.5">
                 {/* Field Nama Lengkap */}
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">
+                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
                     Nama Lengkap
                   </label>
                   <div className="relative flex items-center">
@@ -336,7 +347,7 @@ export const AuthCard: React.FC<AuthCardProps> = ({ initialMode = "login" }) => 
                         if (registerError) setRegisterError("");
                       }}
                       placeholder="Nama lengkap Anda"
-                      className="w-full rounded-xl bg-slate-900/70 border border-white/10 px-4 py-2 pl-10 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                      className="w-full rounded-xl bg-white dark:bg-slate-900/70 border border-slate-300 dark:border-white/10 px-4 py-2 pl-10 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
                     />
                   </div>
                 </div>
@@ -344,7 +355,7 @@ export const AuthCard: React.FC<AuthCardProps> = ({ initialMode = "login" }) => 
                 {/* Field Baris Ganda: Username & Email */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">
+                    <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
                       Username
                     </label>
                     <div className="relative flex items-center">
@@ -360,13 +371,13 @@ export const AuthCard: React.FC<AuthCardProps> = ({ initialMode = "login" }) => 
                           if (registerError) setRegisterError("");
                         }}
                         placeholder="username"
-                        className="w-full rounded-xl bg-slate-900/70 border border-white/10 px-4 py-2 pl-8 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                        className="w-full rounded-xl bg-white dark:bg-slate-900/70 border border-slate-300 dark:border-white/10 px-4 py-2 pl-8 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">
+                    <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
                       Email
                     </label>
                     <div className="relative flex items-center">
@@ -382,7 +393,7 @@ export const AuthCard: React.FC<AuthCardProps> = ({ initialMode = "login" }) => 
                           if (registerError) setRegisterError("");
                         }}
                         placeholder="nama@email.com"
-                        className="w-full rounded-xl bg-slate-900/70 border border-white/10 px-4 py-2 pl-10 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                        className="w-full rounded-xl bg-white dark:bg-slate-900/70 border border-slate-300 dark:border-white/10 px-4 py-2 pl-10 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
                       />
                     </div>
                   </div>
@@ -391,7 +402,7 @@ export const AuthCard: React.FC<AuthCardProps> = ({ initialMode = "login" }) => 
                 {/* Field Baris Ganda: Password & Konfirmasi Password */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">
+                    <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
                       Password
                     </label>
                     <div className="relative flex items-center">
@@ -407,12 +418,12 @@ export const AuthCard: React.FC<AuthCardProps> = ({ initialMode = "login" }) => 
                           if (registerError) setRegisterError("");
                         }}
                         placeholder="Min 6 karakter"
-                        className="w-full rounded-xl bg-slate-900/70 border border-white/10 px-3.5 py-2 pl-9 pr-9 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                        className="w-full rounded-xl bg-white dark:bg-slate-900/70 border border-slate-300 dark:border-white/10 px-3.5 py-2 pl-9 pr-9 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
                       />
                       <button
                         type="button"
                         onClick={() => setShowRegisterPassword((p) => !p)}
-                        className="absolute right-3 text-slate-400 hover:text-white transition-colors"
+                        className="absolute right-3 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors cursor-pointer"
                         aria-label="Tampilkan atau sembunyikan password"
                       >
                         {showRegisterPassword ? <EyeOffIcon size={14} /> : <EyeIcon size={14} />}
@@ -421,7 +432,7 @@ export const AuthCard: React.FC<AuthCardProps> = ({ initialMode = "login" }) => 
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">
+                    <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
                       Ulangi Password
                     </label>
                     <div className="relative flex items-center">
@@ -437,12 +448,12 @@ export const AuthCard: React.FC<AuthCardProps> = ({ initialMode = "login" }) => 
                           if (registerError) setRegisterError("");
                         }}
                         placeholder="Konfirmasi"
-                        className="w-full rounded-xl bg-slate-900/70 border border-white/10 px-3.5 py-2 pl-9 pr-9 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                        className="w-full rounded-xl bg-white dark:bg-slate-900/70 border border-slate-300 dark:border-white/10 px-3.5 py-2 pl-9 pr-9 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
                       />
                       <button
                         type="button"
                         onClick={() => setShowConfirmPassword((p) => !p)}
-                        className="absolute right-3 text-slate-400 hover:text-white transition-colors"
+                        className="absolute right-3 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors cursor-pointer"
                         aria-label="Tampilkan atau sembunyikan password konfirmasi"
                       >
                         {showConfirmPassword ? <EyeOffIcon size={14} /> : <EyeIcon size={14} />}
@@ -451,11 +462,11 @@ export const AuthCard: React.FC<AuthCardProps> = ({ initialMode = "login" }) => 
                   </div>
                 </div>
 
-                {/* Tombol Buat Akun */}
+                {/* Tombol Buat Akun: Navy Terang di Tema Gelap MAUPUN Terang */}
                 <button
                   type="submit"
                   disabled={isRegisterLoading}
-                  className="w-full mt-2 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-600 text-white font-semibold py-3 text-sm shadow-[0_4px_20px_rgba(37,99,235,0.35)] active:scale-[0.98] transition-all disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full mt-2 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-semibold py-3 text-sm shadow-[0_4px_20px_rgba(37,99,235,0.35)] active:scale-[0.98] transition-all disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {isRegisterLoading ? (
                     <span>Mendaftarkan akun...</span>
@@ -469,13 +480,13 @@ export const AuthCard: React.FC<AuthCardProps> = ({ initialMode = "login" }) => 
               </form>
 
               {/* Tautan Geser ke Login */}
-              <div className="mt-5 pt-4 border-t border-white/10 text-center">
-                <p className="text-xs text-slate-400">
+              <div className="mt-5 pt-4 border-t border-slate-300/60 dark:border-white/10 text-center">
+                <p className="text-xs text-slate-600 dark:text-slate-400">
                   Sudah memiliki akun?{" "}
                   <button
                     type="button"
                     onClick={() => switchMode("login")}
-                    className="font-semibold text-blue-400 hover:text-blue-300 transition-colors cursor-pointer inline-flex items-center gap-1 ml-0.5"
+                    className="font-semibold text-blue-600 dark:text-blue-400 hover:underline transition-colors cursor-pointer inline-flex items-center gap-1 ml-0.5"
                   >
                     <span>← Masuk ke Akun Anda</span>
                   </button>

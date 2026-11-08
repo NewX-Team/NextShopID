@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { ThemeProvider } from "@/context/ThemeContext";
 import { AuthProvider } from "@/context/AuthContext";
 import { Navbar } from "@/components/layout/Navbar";
 
@@ -14,12 +15,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="id" className="h-full antialiased">
-      <body className="min-h-full flex flex-col bg-white text-slate-900 selection:bg-slate-900 selection:text-white">
-        <AuthProvider>
-          <Navbar />
-          <div className="flex flex-1 flex-col">{children}</div>
-        </AuthProvider>
+    <html lang="id" className="h-full antialiased" suppressHydrationWarning>
+      <body className="min-h-full flex flex-col bg-white dark:bg-[#0b0f19] text-slate-900 dark:text-white transition-colors duration-200">
+        <ThemeProvider>
+          <AuthProvider>
+            <Navbar />
+            <div className="flex flex-1 flex-col">{children}</div>
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

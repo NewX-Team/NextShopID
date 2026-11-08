@@ -11,7 +11,7 @@ router.post("/login", authController.login.bind(authController));
 // Endpoint Privat: Ambil data akun sendiri berdasarkan token
 router.get("/me", authenticate, authController.me.bind(authController));
 
-// Endpoint Khusus Admin (RBAC check test)
+// Endpoint Khusus Role Admin (RBAC Guard)
 router.get(
   "/admin-only",
   authenticate,
@@ -20,6 +20,19 @@ router.get(
     res.json({
       success: true,
       message: `Akses diterima. Selamat datang Admin: ${req.user?.username}`,
+    });
+  }
+);
+
+// Endpoint Khusus Role Penjual (RBAC Guard)
+router.get(
+  "/penjual-only",
+  authenticate,
+  requireRole(["penjual"]),
+  (req, res) => {
+    res.json({
+      success: true,
+      message: `Akses diterima. Selamat datang Penjual: ${req.user?.username}`,
     });
   }
 );

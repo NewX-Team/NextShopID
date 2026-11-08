@@ -8,7 +8,10 @@ const globalsCssPath = path.join(frontendDir, "app", "globals.css");
 
 async function compileCss() {
   const startTime = Date.now();
-  const srcCss = `@import "tailwindcss";\n`;
+  const srcCss = `
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+`;
 
   try {
     const compiler = await compile(srcCss, {
@@ -21,6 +24,7 @@ async function compileCss() {
       sources: [
         { base: path.join(frontendDir, "app"), pattern: "**/*", negated: false },
         { base: path.join(frontendDir, "components"), pattern: "**/*", negated: false },
+        { base: path.join(frontendDir, "context"), pattern: "**/*", negated: false },
       ],
     });
 
@@ -34,6 +38,12 @@ async function compileCss() {
   --foreground: #0f172a;
 }
 
+.dark {
+  --background: #0b0f19;
+  --foreground: #f8fafc;
+  color-scheme: dark;
+}
+
 body {
   background-color: var(--background);
   color: var(--foreground);
@@ -41,6 +51,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 `;
 
@@ -55,12 +66,13 @@ body {
 // Jalankan kompilasi awal
 compileCss();
 
-// Jika dipanggil dengan flag --watch, pantau perubahan file di app/ dan components/
+// Jika dipanggil dengan flag --watch, pantau perubahan file di app/, components/, context/
 if (process.argv.includes("--watch")) {
   let debounceTimeout = null;
   const watchDirs = [
     path.join(frontendDir, "app"),
     path.join(frontendDir, "components"),
+    path.join(frontendDir, "context"),
   ];
 
   console.log("[Tailwind CSS] Menjalankan file watcher untuk auto-recompile...");

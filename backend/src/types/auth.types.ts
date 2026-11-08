@@ -1,8 +1,11 @@
 /**
  * Definisi role akun sistem.
- * Saat ini dibatasi hanya ada 2 role: 'admin' dan 'user'.
+ * Mendukung 3 role dengan batasan hak akses masing-masing:
+ * - 'admin'   : Administrator platform NextShopID
+ * - 'penjual' : Merchant / Penjual toko
+ * - 'user'    : Pembeli / Pelanggan e-commerce
  */
-export type UserRole = "admin" | "user";
+export type UserRole = "admin" | "penjual" | "user";
 
 export interface User {
   id: number;
@@ -18,7 +21,7 @@ export interface User {
 // User object tanpa field password untuk keamanan response JSON
 export type SafeUser = Omit<User, "password">;
 
-// Payload pendaftaran user baru
+// Payload pendaftaran user baru (khusus pembeli/user)
 export interface RegisterDTO {
   name: string;
   username: string;

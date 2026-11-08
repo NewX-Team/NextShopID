@@ -7,12 +7,14 @@
  *   field ini akan di-strip oleh authService sebelum payload dikirim ke API backend.
  */
 
+export type UserRole = "admin" | "penjual" | "user";
+
 export interface User {
   id: string | number;
   name: string;
   username: string;
   email: string;
-  role?: "admin" | "user";
+  role?: UserRole;
 }
 
 export interface LoginInput {
