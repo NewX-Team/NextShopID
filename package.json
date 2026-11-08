@@ -3,6 +3,18 @@
   "version": "1.0.0",
   "private": true,
   "description": "NextShopID Root Workspace",
+  "homepage": "https://github.com/NewX-Team/NextShopID#readme",
+  "bugs": {
+    "url": "https://github.com/NewX-Team/NextShopID/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NewX-Team/NextShopID.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
   "scripts": {
     "init": "node scripts/init.js",
     "dev": "concurrently -n \"backend,frontend\" -c \"blue,green\" \"npm run dev:backend\" \"npm run dev:frontend\"",

@@ -52,9 +52,12 @@ runCommand("npm install", backendDir);
 console.log("\n-> [4/5] Menginstal dependensi Frontend...");
 runCommand("npm install", frontendDir);
 
-// 3. Build & Inisialisasi Database Backend
+// 3. Build & Inisialisasi Database Backend & Compile Frontend CSS
 console.log("\n-> [5/5] Membangun backend & inisialisasi SQLite database...");
 runCommand("npm run build", backendDir);
+
+console.log("\n-> Mengompilasi Tailwind CSS stylesheet frontend...");
+runCommand("node scripts/compile-css.js", frontendDir);
 
 // Jalankan seeder database secara otomatis
 const initDbCode = `

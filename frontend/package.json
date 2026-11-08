@@ -3,7 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "build:css": "node scripts/compile-css.js",
+    "predev": "node scripts/compile-css.js",
+    "dev": "concurrently -k -n \"css,next\" -c \"cyan,blue\" \"node scripts/compile-css.js --watch\" \"next dev\"",
+    "prebuild": "node scripts/compile-css.js",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
