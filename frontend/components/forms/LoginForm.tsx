@@ -8,9 +8,11 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { authService } from "@/services/auth.service";
 import { LoginInput } from "@/types/auth";
+import { useAuth } from "@/context/AuthContext";
 
 export const LoginForm: React.FC = () => {
   const router = useRouter();
+  const { login } = useAuth();
 
   const [formData, setFormData] = useState<LoginInput>({
     identifier: "",
@@ -36,14 +38,9 @@ export const LoginForm: React.FC = () => {
     try {
       const response = await authService.login(formData);
 
-      if (response.success && response.token) {
-        // Simpan token JWT dan objek profil user di localStorage browser
-        localStorage.setItem("token", response.token);
-        if (response.user) {
-          localStorage.setItem("user", JSON.stringify(response.user));
-        }
-
-        alert(response.message || "Login berhasil!");
+      if (response.success && response.token && response.user) {
+        // Simpan sesi autentikasi ke AuthContext secara reaktif
+        login(response.token, response.user);
         router.push("/");
       } else {
         setErrorMessage(response.message || "Kredensial login tidak valid.");
@@ -78,10 +75,12 @@ export const LoginForm: React.FC = () => {
             style={{
               padding: "10px",
               marginBottom: "16px",
-              border: "1px solid #000",
-              backgroundColor: "#f5f5f5",
+              border: "1px solid #e11d48",
+              backgroundColor: "#fff1f2",
+              color: "#be123c",
+              borderRadius: "8px",
               fontSize: "13px",
-              fontWeight: "bold",
+              fontWeight: 500,
             }}
           >
             {errorMessage}

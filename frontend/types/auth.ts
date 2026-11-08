@@ -7,6 +7,14 @@
  *   field ini akan di-strip oleh authService sebelum payload dikirim ke API backend.
  */
 
+export interface User {
+  id: string | number;
+  name: string;
+  username: string;
+  email: string;
+  role?: "admin" | "user";
+}
+
 export interface LoginInput {
   identifier: string;
   password: string;
@@ -25,11 +33,5 @@ export interface AuthResponse {
   success: boolean;
   message: string;
   token?: string;
-  user?: {
-    id: string | number;
-    name: string;
-    username: string;
-    email: string;
-    role?: "admin" | "user";
-  };
+  user?: User;
 }

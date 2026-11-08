@@ -8,9 +8,11 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { authService } from "@/services/auth.service";
 import { RegisterInput } from "@/types/auth";
+import { useAuth } from "@/context/AuthContext";
 
 export const RegisterForm: React.FC = () => {
   const router = useRouter();
+  const { login } = useAuth();
 
   const [formData, setFormData] = useState<RegisterInput>({
     name: "",
@@ -36,7 +38,12 @@ export const RegisterForm: React.FC = () => {
 
     // Validasi client-side awal sebelum menembak jaringan
     if (formData.password !== formData.newPassword) {
-      setErrorMessage("Password dan New Password tidak cocok. Harap periksa kembali.");
+      setErrorMessage("Password dan Konfirmasi Password tidak cocok. Harap periksa kembali.");
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      setErrorMessage("Password minimal 6 karakter.");
       return;
     }
 
@@ -47,8 +54,18 @@ export const RegisterForm: React.FC = () => {
       const response = await authService.register(formData);
 
       if (response.success) {
-        alert(response.message || "Pendaftaran akun berhasil, silakan login!");
-        router.push("/login");
+        // Otomatis login dengan kredensial baru agar user langsung masuk ke sesi aktif
+        const loginRes = await authService.login({
+          identifier: formData.email,
+          password: formData.password,
+        });
+
+        if (loginRes.success && loginRes.token && loginRes.user) {
+          login(loginRes.token, loginRes.user);
+          router.push("/");
+        } else {
+          router.push("/login");
+        }
       } else {
         setErrorMessage(response.message || "Pendaftaran gagal diverifikasi server.");
       }
@@ -82,10 +99,12 @@ export const RegisterForm: React.FC = () => {
             style={{
               padding: "10px",
               marginBottom: "16px",
-              border: "1px solid #000",
-              backgroundColor: "#f5f5f5",
+              border: "1px solid #e11d48",
+              backgroundColor: "#fff1f2",
+              color: "#be123c",
+              borderRadius: "8px",
               fontSize: "13px",
-              fontWeight: "bold",
+              fontWeight: 500,
             }}
           >
             {errorMessage}
@@ -93,12 +112,12 @@ export const RegisterForm: React.FC = () => {
         )}
 
         <Input
-          label="Name"
+          label="Nama Lengkap"
           name="name"
           type="text"
           value={formData.name}
           onChange={handleChange}
-          placeholder="Nama lengkap"
+          placeholder="Masukkan nama lengkap Anda"
           required
         />
 
@@ -108,7 +127,7 @@ export const RegisterForm: React.FC = () => {
           type="text"
           value={formData.username}
           onChange={handleChange}
-          placeholder="Username unik"
+          placeholder="Pilih username unik"
           required
         />
 
@@ -128,22 +147,22 @@ export const RegisterForm: React.FC = () => {
           type="password"
           value={formData.password}
           onChange={handleChange}
-          placeholder="Minimal 6-8 karakter"
+          placeholder="Minimal 6 karakter"
           required
         />
 
         <Input
-          label="New Password"
+          label="Konfirmasi Password"
           name="newPassword"
           type="password"
           value={formData.newPassword}
           onChange={handleChange}
-          placeholder="Ketik ulang password di atas"
+          placeholder="Ulangi password di atas"
           required
         />
 
         <Button type="submit" isLoading={isLoading} style={{ marginTop: "8px" }}>
-          Register
+          Daftar Akun
         </Button>
       </form>
     </Card>
