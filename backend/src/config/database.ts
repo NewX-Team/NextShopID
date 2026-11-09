@@ -162,3 +162,14 @@ function seedDefaultUser(): void {
     console.log("[Database] Seeder: Akun pembeli default berhasil dibuat (user: pembeli / pembeli@gmail.com, pass: pembeli12345)");
   }
 }
+
+/**
+ * Membersihkan data tabel dan mengembalikan ke seeder default (khusus fase testing)
+ */
+export function resetDatabaseForTesting(): void {
+  db.exec("DELETE FROM password_resets;");
+  db.exec("DELETE FROM users;");
+  seedDefaultAdmin();
+  seedDefaultPenjual();
+  seedDefaultUser();
+}

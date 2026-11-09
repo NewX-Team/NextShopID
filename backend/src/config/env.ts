@@ -13,14 +13,18 @@ export const ENV = {
 
   // Direktori penyimpanan file SQLite
   DATA_DIR: path.resolve(__dirname, "../../data"),
-  DB_NAME: "app.sqlite",
+  DB_NAME: process.env.NODE_ENV === "test" ? "app.test.sqlite" : (process.env.DB_NAME || "app.sqlite"),
 
   // URL aplikasi frontend untuk membentuk tautan aksi di email (mis. reset password)
   FRONTEND_URL: process.env.FRONTEND_URL || "http://localhost:3000",
 
   // Driver pengiriman email: 'log' (catat ke file/terminal) atau 'smtp' (kirim nyata)
   MAIL_MAILER: (process.env.MAIL_MAILER || "log") as "log" | "smtp",
-  MAIL_LOG_PATH: path.resolve(__dirname, "../../", process.env.MAIL_LOG_PATH || "logs/mail.log"),
+  MAIL_LOG_PATH: path.resolve(
+    __dirname,
+    "../../",
+    process.env.NODE_ENV === "test" ? "logs/mail.test.log" : (process.env.MAIL_LOG_PATH || "logs/mail.log")
+  ),
 
   // Konfigurasi transport SMTP
   MAIL_HOST: process.env.MAIL_HOST || "smtp.gmail.com",
