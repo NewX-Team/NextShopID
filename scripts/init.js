@@ -67,14 +67,37 @@ const initDbCode = `
 `;
 runCommand(`node -e "${initDbCode.replace(/\n/g, " ")}"`, backendDir);
 
+// Baca port backend dan frontend secara dinamis dari file .env masing-masing
+function getBackendPort() {
+  if (fs.existsSync(backendEnv)) {
+    const content = fs.readFileSync(backendEnv, "utf-8");
+    const match = content.match(/^PORT\s*=\s*(\d+)/m);
+    if (match) return match[1];
+  }
+  return "5001";
+}
+
+function getFrontendPort() {
+  if (fs.existsSync(frontendEnvLocal)) {
+    const content = fs.readFileSync(frontendEnvLocal, "utf-8");
+    const match = content.match(/^PORT\s*=\s*(\d+)/m);
+    if (match) return match[1];
+  }
+  return "3000";
+}
+
+const backendPort = getBackendPort();
+const frontendPort = getFrontendPort();
+
 console.log("\n==================================================");
 console.log("   Inisialisasi Proyek NextShopID Selesai!        ");
 console.log("==================================================");
 console.log("\nUntuk mulai menjalankan development server:");
 console.log("  npm run dev\n");
 console.log("URL Aplikasi:");
-console.log("  * Frontend Web : http://localhost:3000");
-console.log("  * Backend API  : http://localhost:5000/api");
+console.log(`  * Frontend Web : http://localhost:${frontendPort}`);
+console.log(`  * Backend API  : http://localhost:${backendPort}/api`);
+console.log(`  * Swagger Docs : http://localhost:${backendPort}/api/docs`);
 console.log("\nAkun Default Admin:");
 console.log("  * Username     : admin");
 console.log("  * Password     : admin12345");

@@ -1,7 +1,7 @@
 import { LoginInput, RegisterInput, AuthResponse } from "@/types/auth";
 
 // URL dasar API Backend Express
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api";
 
 export const authService = {
   /**
@@ -39,7 +39,7 @@ export const authService = {
       console.error("[authService.login] Gagal memanggil backend Express:", error);
       return {
         success: false,
-        message: "Tidak dapat terhubung ke server backend. Pastikan server backend sedang berjalan di http://localhost:5000.",
+        message: "Tidak dapat terhubung ke server backend. Pastikan server backend sedang berjalan di http://localhost:5001.",
       };
     }
   },
@@ -83,7 +83,7 @@ export const authService = {
       console.error("[authService.register] Gagal memanggil backend Express:", error);
       return {
         success: false,
-        message: "Tidak dapat terhubung ke server backend. Pastikan server backend sedang berjalan di http://localhost:5000.",
+        message: "Tidak dapat terhubung ke server backend. Pastikan server backend sedang berjalan di http://localhost:5001.",
       };
     }
   },
