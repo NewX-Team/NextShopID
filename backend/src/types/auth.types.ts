@@ -42,3 +42,29 @@ export interface AuthTokenPayload {
   email: string;
   role: UserRole;
 }
+
+// Payload permintaan token pemulihan kata sandi via email
+export interface ForgotPasswordDTO {
+  email: string;
+}
+
+// Payload penetapan kata sandi baru menggunakan token reset valid
+export interface ResetPasswordDTO {
+  token: string;
+  password: string;
+}
+
+// Payload penggantian kata sandi untuk pengguna yang telah terotentikasi
+export interface ChangePasswordDTO {
+  currentPassword: string;
+  newPassword: string;
+}
+
+// Representasi rekaman token reset pada tabel password_resets
+export interface PasswordResetRecord {
+  id: number;
+  email: string;
+  token: string;
+  expires_at: string;
+  created_at: string;
+}
