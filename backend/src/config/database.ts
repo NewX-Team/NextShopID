@@ -91,6 +91,10 @@ export function initDatabase(): void {
     db.exec("ALTER TABLE users ADD COLUMN store_balance REAL NOT NULL DEFAULT 0;");
     console.log("[Database] Kolom 'store_balance' berhasil ditambahkan ke tabel users.");
   }
+  if (!userColumns.some((c) => c.name === "buyer_balance")) {
+    db.exec("ALTER TABLE users ADD COLUMN buyer_balance REAL NOT NULL DEFAULT 0;");
+    console.log("[Database] Kolom 'buyer_balance' berhasil ditambahkan ke tabel users.");
+  }
   if (!userColumns.some((c) => c.name === "verification_status")) {
     db.exec("ALTER TABLE users ADD COLUMN verification_status TEXT NOT NULL DEFAULT 'unverified';");
     console.log("[Database] Kolom 'verification_status' berhasil ditambahkan ke tabel users.");
@@ -108,7 +112,27 @@ export function initDatabase(): void {
     console.log("[Database] Kolom 'verification_rejection_reason' berhasil ditambahkan ke tabel users.");
   }
 
-  // 2. Inisialisasi tabel token reset kata sandi
+  // 2. Inisialisasi tabel riwayat mutasi saldo (penjual & pembeli)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS balance_mutations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      role TEXT NOT NULL,
+      type TEXT NOT NULL,
+      amount REAL NOT NULL,
+      balance_before REAL NOT NULL,
+      balance_after REAL NOT NULL,
+      description TEXT NOT NULL,
+      admin_id INTEGER DEFAULT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_balance_mutations_user ON balance_mutations(user_id);
+    CREATE INDEX IF NOT EXISTS idx_balance_mutations_created ON balance_mutations(created_at);
+  `);
+
+  // 3. Inisialisasi tabel token reset kata sandi
   db.exec(`
     CREATE TABLE IF NOT EXISTS password_resets (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

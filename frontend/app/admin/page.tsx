@@ -8,6 +8,7 @@ import { adminService } from "@/services/admin.service";
 import { AdminSidebar, AdminMenuKey } from "@/components/admin/AdminSidebar";
 import { UserManagementView } from "@/components/admin/UserManagementView";
 import { SellerVerificationManagementView } from "@/components/admin/SellerVerificationManagementView";
+import { SellerBalanceManagementView } from "@/components/admin/SellerBalanceManagementView";
 import {
   DashboardIcon,
   ShoppingBagIcon,
@@ -18,6 +19,8 @@ import {
   PercentIcon,
   SettingsIcon,
   UserCheckIcon,
+  WalletIcon,
+  CreditCardIcon,
 } from "@/components/ui/icons";
 
 interface MenuMeta {
@@ -69,6 +72,20 @@ const MENU_METAS: Record<AdminMenuKey, MenuMeta> = {
     description:
       "Audit identitas toko dan pemilik usaha, berikan persetujuan lencana terverifikasi (ACC), atau tolak dengan alasan terperinci.",
     icon: UserCheckIcon,
+  },
+  saldo_penjual: {
+    title: "Saldo Akun Penjual",
+    badge: "Finansial Merchant",
+    description:
+      "Pemantauan saldo live toko seluruh merchant, penambahan saldo manual oleh admin, dan audit riwayat mutasi kredit.",
+    icon: WalletIcon,
+  },
+  saldo_pembeli: {
+    title: "Saldo Akun Pembeli",
+    badge: "Finansial Pelanggan",
+    description:
+      "Pemantauan dompet belanja pelanggan, riwayat pengembalian dana (refund), dan manajemen saldo akun pembeli.",
+    icon: CreditCardIcon,
   },
   keuangan: {
     title: "Laporan Keuangan",
@@ -260,7 +277,7 @@ export default function AdminPage() {
           </div>
         </header>
 
-        {/* Canvas Body: Manajemen Pengguna, Verifikasi Penjual, atau Placeholder Menu */}
+        {/* Canvas Body: Manajemen Pengguna, Verifikasi Penjual, Saldo Penjual, atau Placeholder Menu */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8">
           <div className="max-w-7xl mx-auto">
             {activeMenu === "pengguna" ? (
@@ -271,6 +288,8 @@ export default function AdminPage() {
                   setPendingVerificationsCount(latestStats.pendingCount);
                 }}
               />
+            ) : activeMenu === "saldo_penjual" ? (
+              <SellerBalanceManagementView />
             ) : (
               <div className="py-12 flex flex-col items-center justify-center text-center">
                 {/* Kartu Hero Placeholder Menu */}

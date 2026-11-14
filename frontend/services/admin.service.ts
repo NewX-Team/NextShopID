@@ -77,6 +77,72 @@ export interface AdminSellerVerificationItem {
   updatedAt: string;
 }
 
+export interface AdminSellerBalanceItem {
+  id: number;
+  name: string;
+  username: string;
+  email: string;
+  role: string;
+  status: string;
+  suspensionReason?: string | null;
+  isStoreOpen: boolean;
+  storeBalance: number;
+  buyerBalance: number;
+  verificationStatus: "unverified" | "pending" | "verified" | "rejected";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminSellerBalanceStats {
+  totalSellers: number;
+  totalStoreBalance: number;
+  averageStoreBalance: number;
+  activeBalanceCount: number;
+  zeroBalanceCount: number;
+  openStoreCount: number;
+}
+
+export interface AdminGetSellerBalancesResponse {
+  success: boolean;
+  message?: string;
+  data: AdminSellerBalanceItem[];
+  stats: AdminSellerBalanceStats;
+  meta: {
+    totalFiltered: number;
+    search: string;
+    balanceStatus: string;
+    storeStatus: string;
+    sort: string;
+    timestamp: string;
+  };
+}
+
+export interface AdminBalanceMutationItem {
+  id: number;
+  userId: number;
+  role: string;
+  type: string;
+  amount: number;
+  balanceBefore: number;
+  balanceAfter: number;
+  description: string;
+  adminId: number | null;
+  createdAt: string;
+}
+
+export interface AdminTopupBalanceResponse {
+  success: boolean;
+  message?: string;
+  seller?: Partial<AdminSellerBalanceItem>;
+  mutation?: AdminBalanceMutationItem;
+}
+
+export interface AdminGetBalanceHistoryResponse {
+  success: boolean;
+  message?: string;
+  data: AdminBalanceMutationItem[];
+}
+
 export interface AdminVerificationStats {
   totalPenjual: number;
   pendingCount: number;
@@ -549,6 +615,156 @@ export const adminService = {
       return {
         success: false,
         message: "Gagal memproses keputusan verifikasi penjual.",
+      };
+    }
+  },
+
+  /**
+   * Mengambil daftar saldo seluruh penjual secara realtime beserta statistik ringkasan
+   * GET /api/admin/sellers/balances
+   */
+  async getSellerBalances(
+    token: string,
+    filters?: {
+      search?: string;
+      balanceStatus?: string;
+      storeStatus?: string;
+      sort?: string;
+    }
+  ): Promise<AdminGetSellerBalancesResponse> {
+    try {
+      const params = new URLSearchParams();
+      if (filters?.search) params.append("search", filters.search);
+      if (filters?.balanceStatus) params.append("balanceStatus", filters.balanceStatus);
+      if (filters?.storeStatus) params.append("storeStatus", filters.storeStatus);
+      if (filters?.sort) params.append("sort", filters.sort);
+
+      const qs = params.toString() ? `?${params.toString()}` : "";
+      const response = await fetch(`${API_URL}/admin/sellers/balances${qs}`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        return {
+          success: false,
+          message: result.message || "Gagal mengambil data saldo penjual.",
+          data: [],
+          stats: {
+            totalSellers: 0,
+            totalStoreBalance: 0,
+            averageStoreBalance: 0,
+            activeBalanceCount: 0,
+            zeroBalanceCount: 0,
+            openStoreCount: 0,
+          },
+          meta: {
+            totalFiltered: 0,
+            search: "",
+            balanceStatus: "all",
+            storeStatus: "all",
+            sort: "highest_balance",
+            timestamp: new Date().toISOString(),
+          },
+        };
+      }
+
+      return result;
+    } catch (error) {
+      console.error("[adminService.getSellerBalances] Error:", error);
+      return {
+        success: false,
+        message: "Gagal terhubung ke backend server.",
+        data: [],
+        stats: {
+          totalSellers: 0,
+          totalStoreBalance: 0,
+          averageStoreBalance: 0,
+          activeBalanceCount: 0,
+          zeroBalanceCount: 0,
+          openStoreCount: 0,
+        },
+        meta: {
+          totalFiltered: 0,
+          search: "",
+          balanceStatus: "all",
+          storeStatus: "all",
+          sort: "highest_balance",
+          timestamp: new Date().toISOString(),
+        },
+      };
+    }
+  },
+
+  /**
+   * Menambahkan saldo secara manual ke akun penjual oleh Administrator
+   * POST /api/admin/sellers/:id/balance/topup
+   */
+  async topupSellerBalance(
+    token: string,
+    sellerId: number,
+    payload: {
+      amount: number;
+      description?: string;
+    }
+  ): Promise<AdminTopupBalanceResponse> {
+    try {
+      const response = await fetch(`${API_URL}/admin/sellers/${sellerId}/balance/topup`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error("[adminService.topupSellerBalance] Error:", error);
+      return {
+        success: false,
+        message: "Gagal menambahkan saldo akun penjual.",
+      };
+    }
+  },
+
+  /**
+   * Mengambil riwayat mutasi saldo penjual
+   * GET /api/admin/sellers/:id/balance/history
+   */
+  async getSellerBalanceHistory(
+    token: string,
+    sellerId: number
+  ): Promise<AdminGetBalanceHistoryResponse> {
+    try {
+      const response = await fetch(`${API_URL}/admin/sellers/${sellerId}/balance/history`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        return {
+          success: false,
+          message: result.message || "Gagal mengambil riwayat mutasi saldo penjual.",
+          data: [],
+        };
+      }
+
+      return result;
+    } catch (error) {
+      console.error("[adminService.getSellerBalanceHistory] Error:", error);
+      return {
+        success: false,
+        message: "Gagal terhubung ke backend server.",
+        data: [],
       };
     }
   },

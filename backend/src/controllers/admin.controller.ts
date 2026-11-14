@@ -1098,6 +1098,330 @@ export class AdminController {
       });
     }
   }
+
+  /**
+   * Mengambil daftar seluruh saldo akun penjual beserta statistik finansial realtime
+   * GET /api/admin/sellers/balances
+   */
+  async getSellerBalances(req: Request, res: Response): Promise<void> {
+    try {
+      const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
+      const balanceStatusQuery = req.query.balanceStatus || req.query.balance_status;
+      const balanceStatus = typeof balanceStatusQuery === "string" ? balanceStatusQuery.trim() : "all";
+      const storeStatusQuery = req.query.storeStatus || req.query.store_status;
+      const storeStatus = typeof storeStatusQuery === "string" ? storeStatusQuery.trim() : "all";
+      const sort = typeof req.query.sort === "string" ? req.query.sort.trim() : "highest_balance";
+
+      // 1. Hitung statistik finansial penjual agregat secara realtime
+      const statsStmt = db.prepare(`
+        SELECT 
+          COUNT(*) as totalPenjual,
+          COALESCE(SUM(store_balance), 0) as totalStoreBalance,
+          COALESCE(AVG(store_balance), 0) as averageStoreBalance,
+          SUM(CASE WHEN store_balance > 0 THEN 1 ELSE 0 END) as sellersWithBalanceCount,
+          SUM(CASE WHEN store_balance <= 0 OR store_balance IS NULL THEN 1 ELSE 0 END) as sellersWithZeroBalanceCount
+        FROM users
+        WHERE role = 'penjual'
+      `);
+
+      const statsResult = statsStmt.get() as unknown as {
+        totalPenjual: number;
+        totalStoreBalance: number;
+        averageStoreBalance: number;
+        sellersWithBalanceCount: number;
+        sellersWithZeroBalanceCount: number;
+      };
+
+      // 2. Susun kueri pemfilteran
+      const conditions: string[] = ["role = 'penjual'"];
+      const params: (string | number)[] = [];
+
+      if (search) {
+        conditions.push("(name LIKE ? OR username LIKE ? OR email LIKE ?)");
+        const pattern = `%${search}%`;
+        params.push(pattern, pattern, pattern);
+      }
+
+      if (balanceStatus === "has_balance") {
+        conditions.push("store_balance > 0");
+      } else if (balanceStatus === "zero_balance") {
+        conditions.push("(store_balance <= 0 OR store_balance IS NULL)");
+      }
+
+      if (storeStatus === "open") {
+        conditions.push("is_store_open = 1");
+      } else if (storeStatus === "closed") {
+        conditions.push("is_store_open = 0");
+      }
+
+      const whereClause = `WHERE ${conditions.join(" AND ")}`;
+
+      let orderBy = "ORDER BY store_balance DESC, name ASC";
+      if (sort === "lowest_balance") {
+        orderBy = "ORDER BY store_balance ASC, name ASC";
+      } else if (sort === "newest") {
+        orderBy = "ORDER BY created_at DESC, id DESC";
+      } else if (sort === "name_asc") {
+        orderBy = "ORDER BY name COLLATE NOCASE ASC";
+      }
+
+      const query = `
+        SELECT 
+          id, name, username, email, role, status, is_store_open, store_balance,
+          verification_status, created_at, updated_at
+        FROM users
+        ${whereClause}
+        ${orderBy}
+      `;
+
+      const listStmt = db.prepare(query);
+      const rows = listStmt.all(...params) as unknown as Array<{
+        id: number;
+        name: string;
+        username: string;
+        email: string;
+        role: string;
+        status: string;
+        is_store_open: number;
+        store_balance: number;
+        verification_status: string | null;
+        created_at: string;
+        updated_at: string;
+      }>;
+
+      const sellers = rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        username: r.username,
+        email: r.email,
+        role: r.role,
+        status: r.status,
+        isStoreOpen: r.is_store_open !== 0,
+        storeBalance: Number(r.store_balance || 0),
+        verificationStatus: r.verification_status || "unverified",
+        createdAt: r.created_at,
+        updatedAt: r.updated_at,
+      }));
+
+      res.json({
+        success: true,
+        message: "Data saldo akun penjual berhasil diambil.",
+        data: sellers,
+        stats: {
+          totalPenjual: statsResult.totalPenjual || 0,
+          totalSellers: statsResult.totalPenjual || 0,
+          totalStoreBalance: Number(statsResult.totalStoreBalance || 0),
+          averageStoreBalance: Math.round(Number(statsResult.averageStoreBalance || 0)),
+          activeBalanceCount: statsResult.sellersWithBalanceCount || 0,
+          sellersWithBalanceCount: statsResult.sellersWithBalanceCount || 0,
+          zeroBalanceCount: statsResult.sellersWithZeroBalanceCount || 0,
+          sellersWithZeroBalanceCount: statsResult.sellersWithZeroBalanceCount || 0,
+        },
+      });
+    } catch (error) {
+      console.error("[AdminController.getSellerBalances] Error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Gagal mengambil data saldo akun penjual.",
+      });
+    }
+  }
+
+  /**
+   * Menambahkan saldo secara manual ke akun penjual oleh Administrator
+   * POST /api/admin/sellers/:id/balance/topup
+   */
+  async topupSellerBalance(req: Request, res: Response): Promise<void> {
+    try {
+      const sellerId = Number(req.params.id);
+      if (!sellerId || isNaN(sellerId)) {
+        res.status(400).json({
+          success: false,
+          message: "ID penjual tidak valid.",
+        });
+        return;
+      }
+
+      const { amount, description } = req.body;
+      const parsedAmount = Number(amount);
+
+      if (isNaN(parsedAmount) || parsedAmount <= 0) {
+        res.status(400).json({
+          success: false,
+          message: "Nominal penambahan saldo harus berupa angka positif lebih dari Rp 0.",
+        });
+        return;
+      }
+
+      if (parsedAmount > 500000000) {
+        res.status(400).json({
+          success: false,
+          message: "Batas maksimal penambahan saldo manual adalah Rp 500.000.000 per transaksi.",
+        });
+        return;
+      }
+
+      // Ambil data penjual saat ini
+      const checkStmt = db.prepare(`
+        SELECT id, name, username, email, store_balance, is_store_open, verification_status, status
+        FROM users
+        WHERE id = ? AND role = 'penjual'
+      `);
+      const seller = checkStmt.get(sellerId) as unknown as {
+        id: number;
+        name: string;
+        username: string;
+        email: string;
+        store_balance: number;
+        is_store_open: number;
+        verification_status: string | null;
+        status: string;
+      } | undefined;
+
+      if (!seller) {
+        res.status(404).json({
+          success: false,
+          message: "Akun penjual tidak ditemukan.",
+        });
+        return;
+      }
+
+      const adminId = req.user?.id || null;
+      const balanceBefore = Number(seller.store_balance || 0);
+      const balanceAfter = balanceBefore + parsedAmount;
+      const noteDesc = typeof description === "string" && description.trim()
+        ? description.trim()
+        : "Penambahan saldo manual oleh Administrator";
+
+      // Lakukan transaksi penambahan saldo dan pencatatan mutasi
+      const updateBalanceStmt = db.prepare(`
+        UPDATE users
+        SET store_balance = store_balance + ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND role = 'penjual'
+      `);
+
+      const insertMutationStmt = db.prepare(`
+        INSERT INTO balance_mutations (
+          user_id, role, type, amount, balance_before, balance_after, description, admin_id
+        ) VALUES (?, 'penjual', 'manual_credit', ?, ?, ?, ?, ?)
+      `);
+
+      updateBalanceStmt.run(parsedAmount, sellerId);
+      const mutationRes = insertMutationStmt.run(
+        sellerId,
+        parsedAmount,
+        balanceBefore,
+        balanceAfter,
+        noteDesc,
+        adminId
+      );
+
+      const formattedAmount = new Intl.NumberFormat("id-ID", {
+        style: "currency",
+        currency: "IDR",
+        maximumFractionDigits: 0,
+      }).format(parsedAmount);
+
+      const formattedNewBalance = new Intl.NumberFormat("id-ID", {
+        style: "currency",
+        currency: "IDR",
+        maximumFractionDigits: 0,
+      }).format(balanceAfter);
+
+      res.status(200).json({
+        success: true,
+        message: `Saldo sebesar ${formattedAmount} berhasil ditambahkan ke toko '${seller.name}'. Saldo saat ini: ${formattedNewBalance}.`,
+        seller: {
+          id: seller.id,
+          name: seller.name,
+          username: seller.username,
+          email: seller.email,
+          status: seller.status,
+          isStoreOpen: seller.is_store_open !== 0,
+          storeBalance: balanceAfter,
+          verificationStatus: seller.verification_status || "unverified",
+        },
+        mutation: {
+          id: mutationRes.lastInsertRowid,
+          userId: sellerId,
+          type: "manual_credit",
+          amount: parsedAmount,
+          balanceBefore,
+          balanceAfter,
+          description: noteDesc,
+          createdAt: new Date().toISOString(),
+        },
+      });
+    } catch (error) {
+      console.error("[AdminController.topupSellerBalance] Error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Gagal menambahkan saldo akun penjual.",
+      });
+    }
+  }
+
+  /**
+   * Mengambil riwayat mutasi saldo akun penjual tertentu
+   * GET /api/admin/sellers/:id/balance/history
+   */
+  async getSellerBalanceHistory(req: Request, res: Response): Promise<void> {
+    try {
+      const sellerId = Number(req.params.id);
+      if (!sellerId || isNaN(sellerId)) {
+        res.status(400).json({
+          success: false,
+          message: "ID penjual tidak valid.",
+        });
+        return;
+      }
+
+      const stmt = db.prepare(`
+        SELECT id, user_id, role, type, amount, balance_before, balance_after, description, admin_id, created_at
+        FROM balance_mutations
+        WHERE user_id = ? AND role = 'penjual'
+        ORDER BY created_at DESC, id DESC
+        LIMIT 50
+      `);
+
+      const mutations = stmt.all(sellerId) as unknown as Array<{
+        id: number;
+        user_id: number;
+        role: string;
+        type: string;
+        amount: number;
+        balance_before: number;
+        balance_after: number;
+        description: string;
+        admin_id: number | null;
+        created_at: string;
+      }>;
+
+      res.json({
+        success: true,
+        message: "Riwayat mutasi saldo penjual berhasil diambil.",
+        data: mutations.map((m) => ({
+          id: m.id,
+          userId: m.user_id,
+          role: m.role,
+          type: m.type,
+          amount: m.amount,
+          balanceBefore: m.balance_before,
+          balanceAfter: m.balance_after,
+          description: m.description,
+          adminId: m.admin_id,
+          createdAt: m.created_at,
+        })),
+      });
+    } catch (error) {
+      console.error("[AdminController.getSellerBalanceHistory] Error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Gagal mengambil riwayat mutasi saldo penjual.",
+      });
+    }
+  }
 }
 
 export const adminController = new AdminController();

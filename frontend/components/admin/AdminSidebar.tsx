@@ -19,6 +19,8 @@ import {
   MenuIcon,
   CloseIcon,
   UserCheckIcon,
+  WalletIcon,
+  CreditCardIcon,
 } from "@/components/ui/icons";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
@@ -30,6 +32,8 @@ export type AdminMenuKey =
   | "pengguna"
   | "verifikasi_penjual"
   | "kategori"
+  | "saldo_penjual"
+  | "saldo_pembeli"
   | "keuangan"
   | "promo"
   | "pengaturan";
@@ -121,6 +125,16 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
     {
       title: "Finansial & Pemasaran",
       items: [
+        {
+          key: "saldo_penjual",
+          label: "Saldo Penjual",
+          icon: WalletIcon,
+        },
+        {
+          key: "saldo_pembeli",
+          label: "Saldo Pembeli",
+          icon: CreditCardIcon,
+        },
         {
           key: "keuangan",
           label: "Laporan Keuangan",

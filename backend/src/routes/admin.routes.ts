@@ -22,6 +22,11 @@ router.delete("/users/:id", adminController.deleteUser.bind(adminController));
 router.get("/verifications", adminController.getVerifications.bind(adminController));
 router.patch("/verifications/:id/decision", adminController.updateVerificationDecision.bind(adminController));
 
+// Finansial - Saldo Penjual
+router.get("/sellers/balances", adminController.getSellerBalances.bind(adminController));
+router.post("/sellers/:id/balance/topup", adminController.topupSellerBalance.bind(adminController));
+router.get("/sellers/:id/balance/history", adminController.getSellerBalanceHistory.bind(adminController));
+
 // Kontrol On/Off Server
 router.get("/server-status", adminController.getServerStatus.bind(adminController));
 router.patch("/server-status", adminController.updateServerStatus.bind(adminController));
