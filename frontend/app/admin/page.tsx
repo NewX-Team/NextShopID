@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { useServerStatus } from "@/context/ServerStatusContext";
+import { adminService } from "@/services/admin.service";
 import { AdminSidebar, AdminMenuKey } from "@/components/admin/AdminSidebar";
 import { UserManagementView } from "@/components/admin/UserManagementView";
 import {
@@ -83,11 +85,34 @@ const MENU_METAS: Record<AdminMenuKey, MenuMeta> = {
 };
 
 export default function AdminPage() {
-  const { user, isAuthenticated, isLoading, logout } = useAuth();
+  const { user, token, isAuthenticated, isLoading, logout } = useAuth();
+  const { isServerActive, setIsServerActive } = useServerStatus();
   const router = useRouter();
 
   const [activeMenu, setActiveMenu] = useState<AdminMenuKey>("pengguna");
-  const [isServerActive, setIsServerActive] = useState<boolean>(true);
+  const [isTogglingServer, setIsTogglingServer] = useState<boolean>(false);
+
+  // Handler toggle server ON / OFF yang tersinkronisasi ke backend
+  const handleToggleServer = async () => {
+    if (!token || isTogglingServer) return;
+    const targetStatus = !isServerActive;
+    setIsTogglingServer(true);
+
+    // Optimistic UI update
+    setIsServerActive(targetStatus);
+
+    try {
+      const res = await adminService.updateServerStatus(token, targetStatus);
+      if (!res.success) {
+        // Rollback status jika request gagal
+        setIsServerActive(!targetStatus);
+      }
+    } catch {
+      setIsServerActive(!targetStatus);
+    } finally {
+      setIsTogglingServer(false);
+    }
+  };
 
   // Validasi Hak Akses Role Admin (RBAC Security Guard)
   useEffect(() => {
@@ -170,8 +195,9 @@ export default function AdminPage() {
                 type="button"
                 role="switch"
                 aria-checked={isServerActive}
-                onClick={() => setIsServerActive((prev) => !prev)}
-                className={`group relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full p-0.5 transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 active:scale-95 ${
+                disabled={isTogglingServer}
+                onClick={handleToggleServer}
+                className={`group relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full p-0.5 transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 active:scale-95 disabled:opacity-60 ${
                   isServerActive
                     ? "bg-emerald-500 shadow-xs shadow-emerald-500/30"
                     : "bg-slate-300 dark:bg-slate-700"

@@ -12,4 +12,8 @@ router.get("/users", adminController.getUsers.bind(adminController));
 router.patch("/users/:id/role", adminController.updateUserRole.bind(adminController));
 router.delete("/users/:id", adminController.deleteUser.bind(adminController));
 
+// Kontrol On/Off Server
+router.get("/server-status", adminController.getServerStatus.bind(adminController));
+router.patch("/server-status", adminController.updateServerStatus.bind(adminController));
+
 export const adminRoutes = router;

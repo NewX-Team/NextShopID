@@ -151,4 +151,60 @@ export const adminService = {
       };
     }
   },
+
+  /**
+   * Mengambil status server secara publik: GET /api/system/status
+   */
+  async getPublicServerStatus(): Promise<{ success: boolean; serverActive: boolean }> {
+    try {
+      const response = await fetch(`${API_URL}/system/status`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        return { success: false, serverActive: true };
+      }
+
+      const result = await response.json();
+      return {
+        success: true,
+        serverActive: typeof result.serverActive === "boolean" ? result.serverActive : true,
+      };
+    } catch {
+      return { success: false, serverActive: true };
+    }
+  },
+
+  /**
+   * Mengubah status on/off server oleh admin: PATCH /api/admin/server-status
+   */
+  async updateServerStatus(
+    token: string,
+    active: boolean
+  ): Promise<{ success: boolean; serverActive: boolean; message?: string }> {
+    try {
+      const response = await fetch(`${API_URL}/admin/server-status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ active }),
+      });
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error("[adminService.updateServerStatus] Error:", error);
+      return {
+        success: false,
+        serverActive: active,
+        message: "Gagal memperbarui status server.",
+      };
+    }
+  },
 };

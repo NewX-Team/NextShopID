@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { db } from "../config/database";
+import { db, isServerActive, setServerActive } from "../config/database";
 import { UserRole } from "../types/auth.types";
 
 export interface AdminUserListItem {
@@ -227,6 +227,56 @@ export class AdminController {
       res.status(500).json({
         success: false,
         message: "Gagal menghapus pengguna.",
+      });
+    }
+  }
+
+  /**
+   * Mengambil status aktif/nonaktif server
+   * GET /api/admin/server-status
+   */
+  async getServerStatus(_req: Request, res: Response): Promise<void> {
+    try {
+      const active = isServerActive();
+      res.json({
+        success: true,
+        serverActive: active,
+      });
+    } catch (error) {
+      console.error("[AdminController.getServerStatus] Error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Gagal mengambil status server.",
+      });
+    }
+  }
+
+  /**
+   * Memperbarui status on/off server
+   * PATCH /api/admin/server-status
+   */
+  async updateServerStatus(req: Request, res: Response): Promise<void> {
+    try {
+      const { active } = req.body;
+      if (typeof active !== "boolean") {
+        res.status(400).json({
+          success: false,
+          message: "Field 'active' harus berupa boolean (true atau false).",
+        });
+        return;
+      }
+
+      setServerActive(active);
+      res.json({
+        success: true,
+        serverActive: active,
+        message: `Server NextShopID berhasil ${active ? "diaktifkan (ON)" : "dinonaktifkan (OFF)"}.`,
+      });
+    } catch (error) {
+      console.error("[AdminController.updateServerStatus] Error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Gagal memperbarui status server.",
       });
     }
   }

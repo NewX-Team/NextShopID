@@ -126,4 +126,38 @@ describe("Admin User Management API - GET /api/admin/users & Actions", () => {
     expect(deleteRes.status).toBe(200);
     expect(deleteRes.body.success).toBe(true);
   });
+
+  it("harus dapat membaca status server dari endpoint publik GET /api/system/status", async () => {
+    const res = await request(app).get("/api/system/status");
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(typeof res.body.serverActive).toBe("boolean");
+  });
+
+  it("admin harus dapat mengubah status on/off server melalui PATCH /api/admin/server-status", async () => {
+    // Matikan server (OFF)
+    const turnOffRes = await request(app)
+      .patch("/api/admin/server-status")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ active: false });
+
+    expect(turnOffRes.status).toBe(200);
+    expect(turnOffRes.body.serverActive).toBe(false);
+
+    // Verifikasi pada endpoint publik bahwa server benar-benar berstatus OFF
+    const checkOff = await request(app).get("/api/system/status");
+    expect(checkOff.body.serverActive).toBe(false);
+
+    // Nyalakan kembali server (ON)
+    const turnOnRes = await request(app)
+      .patch("/api/admin/server-status")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ active: true });
+
+    expect(turnOnRes.status).toBe(200);
+    expect(turnOnRes.body.serverActive).toBe(true);
+
+    const checkOn = await request(app).get("/api/system/status");
+    expect(checkOn.body.serverActive).toBe(true);
+  });
 });

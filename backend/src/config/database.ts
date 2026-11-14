@@ -85,10 +85,48 @@ export function initDatabase(): void {
     CREATE INDEX IF NOT EXISTS idx_password_resets_email ON password_resets(email);
   `);
 
-  // 3. Jalankan seeder akun default sistem (admin, penjual, pembeli)
+  // 3. Inisialisasi tabel pengaturan sistem (Server ON/OFF status)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS system_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    INSERT OR IGNORE INTO system_settings (key, value) VALUES ('server_active', '1');
+  `);
+
+  // 4. Jalankan seeder akun default sistem (admin, penjual, pembeli)
   seedDefaultAdmin();
   seedDefaultPenjual();
   seedDefaultUser();
+}
+
+/**
+ * Memeriksa apakah server sedang dalam status aktif (ON) atau nonaktif (OFF)
+ */
+export function isServerActive(): boolean {
+  try {
+    const stmt = db.prepare("SELECT value FROM system_settings WHERE key = 'server_active'");
+    const row = stmt.get() as unknown as { value: string } | undefined;
+    return row ? row.value === "1" : true;
+  } catch (error) {
+    console.error("[Database.isServerActive] Error:", error);
+    return true;
+  }
+}
+
+/**
+ * Memperbarui status aktif/nonaktif server di basis data
+ */
+export function setServerActive(active: boolean): void {
+  const val = active ? "1" : "0";
+  const stmt = db.prepare(`
+    INSERT INTO system_settings (key, value, updated_at)
+    VALUES ('server_active', ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP
+  `);
+  stmt.run(val);
 }
 
 /**
