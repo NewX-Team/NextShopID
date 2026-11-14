@@ -155,8 +155,9 @@ export const Navbar: React.FC<NavbarProps> = ({ cartItemCount = 0 }) => {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  // Khusus halaman privat Admin & Penjual: Tidak me-render Navbar sama sekali (kanvas putih kosong)
-  if (isPrivatePanel) {
+  // Khusus halaman privat Admin & Penjual, serta pengguna dengan role 'admin':
+  // Tidak me-render Navbar sama sekali karena admin fokus pada administrasi sistem di /admin
+  if (isPrivatePanel || (isAuthenticated && user?.role === "admin")) {
     return null;
   }
 

@@ -85,7 +85,7 @@ export function initDatabase(): void {
     CREATE INDEX IF NOT EXISTS idx_password_resets_email ON password_resets(email);
   `);
 
-  // 3. Jalankan seeder akun dummy untuk ketiga role
+  // 3. Jalankan seeder akun default sistem (admin, penjual, pembeli)
   seedDefaultAdmin();
   seedDefaultPenjual();
   seedDefaultUser();

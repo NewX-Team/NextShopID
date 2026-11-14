@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { authRoutes } from "./auth.routes";
+import { adminRoutes } from "./admin.routes";
 
 /**
  * Root Router API (/api)
@@ -9,5 +10,6 @@ import { authRoutes } from "./auth.routes";
 const apiRouter = Router();
 
 apiRouter.use("/auth", authRoutes);
+apiRouter.use("/admin", adminRoutes);
 
 export { apiRouter };

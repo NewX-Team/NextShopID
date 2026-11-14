@@ -36,6 +36,7 @@ interface AdminSidebarProps {
   activeMenu: AdminMenuKey;
   onSelectMenu: (menu: AdminMenuKey) => void;
   onLogout: () => void;
+  isServerActive?: boolean;
 }
 
 interface MenuItemDef {
@@ -129,6 +130,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   activeMenu,
   onSelectMenu,
   onLogout,
+  isServerActive = true,
 }) => {
   const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -232,16 +234,22 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
       {/* Bagian Bawah: Aksi Cepat, Profil Admin, & Tombol Logout */}
       <div className="p-4 border-t border-slate-200/80 dark:border-white/10 bg-slate-100/50 dark:bg-black/20">
         
-        {/* Tautan Cepat: Lihat Toko Publik & Theme Toggle */}
+        {/* Status Server & Theme Toggle */}
         <div className="flex items-center justify-between mb-3.5 px-1">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-            title="Buka Toko Publik NextShopID"
-          >
-            <span>Lihat Toko Publik</span>
-            <ExternalLinkIcon size={13} />
-          </Link>
+          {isServerActive ? (
+            <div className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span>server sedang aktif</span>
+            </div>
+          ) : (
+            <div className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+              <span className="flex h-2 w-2 rounded-full bg-slate-400 dark:bg-slate-500"></span>
+              <span>server sedang nonaktif</span>
+            </div>
+          )}
 
           {/* Tombol Pengalih Tema Sun/Moon */}
           <button

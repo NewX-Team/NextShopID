@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { AuthProvider } from "@/context/AuthContext";
+import { AdminAccessGuard } from "@/components/auth/AdminAccessGuard";
 import { Navbar } from "@/components/layout/Navbar";
 
 export const metadata: Metadata = {
@@ -19,8 +20,10 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-white dark:bg-[#0b0f19] text-slate-900 dark:text-white transition-colors duration-200">
         <ThemeProvider>
           <AuthProvider>
-            <Navbar />
-            <div className="flex flex-1 flex-col">{children}</div>
+            <AdminAccessGuard>
+              <Navbar />
+              <div className="flex flex-1 flex-col">{children}</div>
+            </AdminAccessGuard>
           </AuthProvider>
         </ThemeProvider>
       </body>

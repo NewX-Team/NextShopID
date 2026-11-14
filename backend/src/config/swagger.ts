@@ -413,5 +413,51 @@ export const swaggerSpec = {
         },
       },
     },
+    "/api/admin/users": {
+      get: {
+        tags: ["Admin - Manajemen Pengguna"],
+        summary: "Mengambil daftar seluruh pengguna dengan filter pencarian dan role",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "search", in: "query", schema: { type: "string" }, description: "Pencarian nama, username, atau email" },
+          { name: "role", in: "query", schema: { type: "string", enum: ["all", "admin", "penjual", "user"] }, description: "Filter berdasarkan role" },
+          { name: "sort", in: "query", schema: { type: "string", enum: ["newest", "oldest", "name_asc", "name_desc"] }, description: "Pengurutan data" },
+        ],
+        responses: {
+          200: { description: "Daftar pengguna dan agregasi statistik berhasil diambil." },
+          401: { description: "Unauthenticated (tidak menyertakan token)." },
+          403: { description: "Forbidden (bukan role admin)." },
+        },
+      },
+    },
+    "/api/admin/users/{id}/role": {
+      patch: {
+        tags: ["Admin - Manajemen Pengguna"],
+        summary: "Mengubah role akun pengguna",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "integer" }, description: "ID akun pengguna" },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["role"],
+                properties: {
+                  role: { type: "string", enum: ["admin", "penjual", "user"] },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: "Role berhasil diperbarui." },
+          400: { description: "Data tidak valid." },
+          403: { description: "Forbidden (tidak dapat mengubah superadmin utama)." },
+        },
+      },
+    },
   },
 };
