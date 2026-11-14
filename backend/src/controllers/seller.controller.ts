@@ -232,20 +232,14 @@ export class SellerController {
         return;
       }
 
-      if (current.verification_status === "verified") {
-        res.status(400).json({
-          success: false,
-          message: "Toko Anda telah terverifikasi resmi oleh admin.",
-        });
-        return;
-      }
-
+      // Tentukan pesan respon berdasarkan status sebelumnya
+      let responseMessage = "Pengajuan verifikasi toko berhasil dikirimkan ke admin untuk ditinjau.";
       if (current.verification_status === "pending") {
-        res.status(400).json({
-          success: false,
-          message: "Pengajuan verifikasi Anda sebelumnya sedang dalam proses peninjauan admin.",
-        });
-        return;
+        responseMessage = "Pengajuan verifikasi toko berhasil diperbarui dan dikirimkan ulang ke admin untuk ditinjau.";
+      } else if (current.verification_status === "rejected") {
+        responseMessage = "Pengajuan verifikasi ulang toko berhasil dikirimkan ke admin untuk ditinjau kembali.";
+      } else if (current.verification_status === "verified") {
+        responseMessage = "Pembaruan data verifikasi toko berhasil diajukan kembali ke admin.";
       }
 
       const {
@@ -319,7 +313,7 @@ export class SellerController {
 
       res.status(200).json({
         success: true,
-        message: "Pengajuan verifikasi toko berhasil dikirimkan ke admin untuk ditinjau.",
+        message: responseMessage,
         verificationStatus: "pending",
         submittedAt: new Date().toISOString(),
         data: verificationPayload,

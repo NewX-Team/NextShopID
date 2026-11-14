@@ -11,6 +11,7 @@ export interface AdminUserListItem {
   role: UserRole;
   status: UserStatus;
   suspension_reason?: string | null;
+  verification_status?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -79,7 +80,7 @@ export class AdminController {
       }
 
       const query = `
-        SELECT id, name, username, email, role, status, suspension_reason, created_at, updated_at
+        SELECT id, name, username, email, role, status, suspension_reason, verification_status, created_at, updated_at
         FROM users
         ${whereClause}
         ${orderBy}

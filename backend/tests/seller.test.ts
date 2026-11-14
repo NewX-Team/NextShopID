@@ -179,20 +179,22 @@ describe("Seller API - GET /api/seller/profile & PATCH /api/seller/store-status"
       expect(profileRes.body.seller.verificationStatus).toBe("pending");
     });
 
-    it("harus menolak pengajuan ulang jika status verifikasi sedang pending", async () => {
+    it("harus berhasil memperbarui pengajuan verifikasi jika seller mengajukan ulang saat pending", async () => {
       const duplicateRes = await request(app)
         .post("/api/seller/verification")
         .set("Authorization", `Bearer ${sellerToken}`)
         .send({
-          ownerName: "Budi Santoso",
+          ownerName: "Budi Santoso Diperbarui",
           idCardNumber: "3201234567890001",
-          phoneNumber: "081234567890",
+          phoneNumber: "081234567899",
           businessType: "umkm",
+          storeDescription: "Toko resmi produk kerajinan kulit lokal Nusantara - Versi 2",
         });
 
-      expect(duplicateRes.status).toBe(400);
-      expect(duplicateRes.body.success).toBe(false);
-      expect(duplicateRes.body.message).toContain("sedang dalam proses peninjauan admin");
+      expect(duplicateRes.status).toBe(200);
+      expect(duplicateRes.body.success).toBe(true);
+      expect(duplicateRes.body.data.ownerName).toBe("Budi Santoso Diperbarui");
+      expect(duplicateRes.body.message).toContain("berhasil diperbarui");
     });
   });
 });

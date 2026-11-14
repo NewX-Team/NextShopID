@@ -10,6 +10,7 @@ export interface AdminUserItem {
   role: UserRole;
   status: UserStatus;
   suspension_reason?: string | null;
+  verification_status?: string | null;
   created_at: string;
   updated_at: string;
 }

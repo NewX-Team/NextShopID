@@ -126,13 +126,40 @@ export const sellerService = {
         body: JSON.stringify(payload),
       });
 
-      const result = await response.json();
-      return result;
-    } catch (error) {
+      let result: any = null;
+      try {
+        result = await response.json();
+      } catch {
+        result = null;
+      }
+
+      if (!response.ok) {
+        if (response.status === 413) {
+          return {
+            success: false,
+            message: "Ukuran dokumen foto terlalu besar. Gunakan foto dengan resolusi lebih kecil (maksimal 5MB).",
+          };
+        }
+        return {
+          success: false,
+          message:
+            result?.message ||
+            `Gagal mengirim pengajuan verifikasi (${response.status}: ${response.statusText}).`,
+        };
+      }
+
+      return (
+        result || {
+          success: true,
+          message: "Pengajuan verifikasi berhasil dikirim.",
+          verificationStatus: "pending",
+        }
+      );
+    } catch (error: any) {
       console.error("[sellerService.submitVerification] Error:", error);
       return {
         success: false,
-        message: "Gagal mengirim pengajuan verifikasi ke admin.",
+        message: error?.message || "Gagal mengirim pengajuan verifikasi ke admin.",
       };
     }
   },

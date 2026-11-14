@@ -721,8 +721,21 @@ export const PenjualPlaceholderView: React.FC<PenjualPlaceholderViewProps> = ({
       <div className="w-full rounded-3xl border border-slate-200/90 dark:border-white/10 bg-white dark:bg-[#0c1220] p-6 sm:p-10 shadow-sm">
         <div className="max-w-2xl space-y-6">
           <div className="flex items-center gap-4 pb-6 border-b border-slate-200/80 dark:border-white/10">
-            <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center text-white font-extrabold text-2xl shadow-md">
-              {sellerProfile?.name ? sellerProfile.name[0]?.toUpperCase() : "P"}
+            <div className="relative shrink-0">
+              <div
+                className={`h-16 w-16 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center text-white font-extrabold text-2xl shadow-md transition-all ${
+                  sellerProfile?.verificationStatus === "verified"
+                    ? "ring-2 ring-red-500 ring-offset-2 dark:ring-offset-[#0c1220]"
+                    : ""
+                }`}
+              >
+                {sellerProfile?.name ? sellerProfile.name[0]?.toUpperCase() : "P"}
+              </div>
+              {sellerProfile?.verificationStatus === "verified" && (
+                <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-sm bg-red-600 text-white text-[9px] font-black uppercase tracking-tight shadow-xs border border-white dark:border-[#0c1220] leading-none pointer-events-none select-none z-10">
+                  Mall
+                </span>
+              )}
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900 dark:text-white">

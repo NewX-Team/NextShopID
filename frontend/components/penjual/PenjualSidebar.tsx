@@ -269,8 +269,21 @@ export const PenjualSidebar: React.FC<PenjualSidebarProps> = ({
           {/* Info Singkat Toko */}
           <div className="flex items-center justify-between gap-3 mb-3">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-xs shrink-0">
-                {user?.name ? user.name[0]?.toUpperCase() : "T"}
+              <div className="relative shrink-0">
+                <div
+                  className={`h-9 w-9 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-xs transition-all ${
+                    verificationStatus === "verified"
+                      ? "ring-2 ring-red-500 ring-offset-1 dark:ring-offset-[#070b14]"
+                      : ""
+                  }`}
+                >
+                  {user?.name ? user.name[0]?.toUpperCase() : "T"}
+                </div>
+                {verificationStatus === "verified" && (
+                  <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 px-1 py-0.2 rounded-xs bg-red-600 text-white text-[7.5px] font-black uppercase tracking-tight shadow-xs border border-white dark:border-[#070b14] leading-none pointer-events-none select-none z-10">
+                    Mall
+                  </span>
+                )}
               </div>
               <div className="min-w-0">
                 <h4 className="text-xs font-bold text-slate-900 dark:text-white truncate">

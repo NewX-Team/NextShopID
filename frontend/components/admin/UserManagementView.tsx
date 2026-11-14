@@ -1062,17 +1062,28 @@ export const UserManagementView: React.FC = () => {
                       {/* Kolom Pengguna (Avatar, Nama, Username, Email) */}
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedUserForDetail(u)}
-                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr ${getAvatarGradient(
-                              u.name,
-                              u.role
-                            )} text-white font-bold text-sm shadow-xs cursor-pointer hover:opacity-90 transition-opacity`}
-                            title="Klik untuk melihat rincian akun"
-                          >
-                            {u.name ? u.name[0]?.toUpperCase() : "U"}
-                          </button>
+                          <div className="relative shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedUserForDetail(u)}
+                              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr ${getAvatarGradient(
+                                u.name,
+                                u.role
+                              )} text-white font-bold text-sm shadow-xs cursor-pointer hover:opacity-90 transition-all ${
+                                u.role === "penjual" && u.verification_status === "verified"
+                                  ? "ring-2 ring-red-500 ring-offset-1 dark:ring-offset-[#111827]"
+                                  : ""
+                              }`}
+                              title="Klik untuk melihat rincian akun"
+                            >
+                              {u.name ? u.name[0]?.toUpperCase() : "U"}
+                            </button>
+                            {u.role === "penjual" && u.verification_status === "verified" && (
+                              <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 px-1.5 py-0.2 rounded-xs bg-red-600 text-white text-[7.5px] font-black uppercase tracking-tight shadow-xs border border-white dark:border-[#111827] leading-none pointer-events-none select-none z-10">
+                                Mall
+                              </span>
+                            )}
+                          </div>
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
                               <button
@@ -1946,13 +1957,24 @@ export const UserManagementView: React.FC = () => {
             </div>
 
             <div className="my-5 text-center">
-              <div
-                className={`flex h-18 w-18 items-center justify-center rounded-3xl bg-gradient-to-tr ${getAvatarGradient(
-                  selectedUserForDetail.name,
-                  selectedUserForDetail.role
-                )} text-white font-extrabold text-2xl mx-auto shadow-lg mb-3`}
-              >
-                {selectedUserForDetail.name[0]?.toUpperCase()}
+              <div className="relative inline-block mx-auto mb-3">
+                <div
+                  className={`flex h-18 w-18 items-center justify-center rounded-3xl bg-gradient-to-tr ${getAvatarGradient(
+                    selectedUserForDetail.name,
+                    selectedUserForDetail.role
+                  )} text-white font-extrabold text-2xl shadow-lg transition-all ${
+                    selectedUserForDetail.role === "penjual" && selectedUserForDetail.verification_status === "verified"
+                      ? "ring-2 ring-red-500 ring-offset-2 dark:ring-offset-[#0b132b]"
+                      : ""
+                  }`}
+                >
+                  {selectedUserForDetail.name[0]?.toUpperCase()}
+                </div>
+                {selectedUserForDetail.role === "penjual" && selectedUserForDetail.verification_status === "verified" && (
+                  <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-sm bg-red-600 text-white text-[9px] font-black uppercase tracking-tight shadow-xs border border-white dark:border-[#0b132b] leading-none pointer-events-none select-none z-10">
+                    Mall
+                  </span>
+                )}
               </div>
               <h4 className="text-lg font-bold text-slate-900 dark:text-white">
                 {selectedUserForDetail.name}

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   SellerProfile,
   SellerVerificationPayload,
@@ -16,6 +16,7 @@ import {
   TrendingUpIcon,
   DollarSignIcon,
   LockIcon,
+  EditIcon,
 } from "@/components/ui/icons";
 
 interface PenjualVerificationViewProps {
@@ -45,10 +46,29 @@ export const PenjualVerificationView: React.FC<PenjualVerificationViewProps> = (
   const [idCardFile, setIdCardFile] = useState<string | null>(submittedData?.idCardPhoto || null);
   const [selfieFile, setSelfieFile] = useState<string | null>(submittedData?.selfiePhoto || null);
 
+  // State mode edit verifikasi ulang
+  const [isEditingVerification, setIsEditingVerification] = useState(false);
+
   // Submission State
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
+
+  // Sinkronisasi data form otomatis saat profile atau submittedData berubah
+  useEffect(() => {
+    if (submittedData) {
+      if (submittedData.ownerName) setOwnerName(submittedData.ownerName);
+      if (submittedData.idCardNumber) setIdCardNumber(submittedData.idCardNumber);
+      if (submittedData.phoneNumber) setPhoneNumber(submittedData.phoneNumber);
+      if (submittedData.businessType) setBusinessType(submittedData.businessType);
+      if (submittedData.storeDescription) setStoreDescription(submittedData.storeDescription);
+      if (submittedData.notes) setNotes(submittedData.notes);
+      if (submittedData.idCardPhoto) setIdCardFile(submittedData.idCardPhoto);
+      if (submittedData.selfiePhoto) setSelfieFile(submittedData.selfiePhoto);
+    } else if (sellerProfile?.name && !ownerName) {
+      setOwnerName(sellerProfile.name);
+    }
+  }, [submittedData, sellerProfile?.name]);
 
   // Format Tanggal
   const formatDateTime = (isoString?: string | null) => {
@@ -75,7 +95,7 @@ export const PenjualVerificationView: React.FC<PenjualVerificationViewProps> = (
     return `${first}${"*".repeat(nik.length - 8)}${last}`;
   };
 
-  // Handle Simulasi / Real File Upload (Base64)
+  // Handle File Upload dengan Kompresi Otomatis Canvas Client-Side
   const handleFileUpload = (
     e: React.ChangeEvent<HTMLInputElement>,
     setter: (val: string) => void
@@ -83,16 +103,64 @@ export const PenjualVerificationView: React.FC<PenjualVerificationViewProps> = (
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      setFormError("Ukuran file maksimal 5MB.");
+    if (file.size > 10 * 1024 * 1024) {
+      setFormError("Ukuran file maksimal 10MB.");
       return;
     }
 
     const reader = new FileReader();
-    reader.onload = () => {
-      setter(reader.result as string);
-      setFormError(null);
+    reader.onload = (event) => {
+      const resultStr = event.target?.result as string;
+      if (!resultStr) return;
+
+      // Kompresi gambar menggunakan canvas jika format gambar
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          const MAX_WIDTH = 1280;
+          const MAX_HEIGHT = 1280;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height = Math.round((height * MAX_WIDTH) / width);
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width = Math.round((width * MAX_HEIGHT) / height);
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressed = canvas.toDataURL("image/jpeg", 0.82);
+            setter(compressed);
+            setFormError(null);
+          } else {
+            setter(resultStr);
+            setFormError(null);
+          }
+        } catch {
+          setter(resultStr);
+          setFormError(null);
+        }
+      };
+
+      img.onerror = () => {
+        setter(resultStr);
+        setFormError(null);
+      };
+
+      img.src = resultStr;
     };
+
     reader.readAsDataURL(file);
   };
 
@@ -143,7 +211,8 @@ export const PenjualVerificationView: React.FC<PenjualVerificationViewProps> = (
     try {
       const res = await sellerService.submitVerification(token, payload);
       if (res.success) {
-        setFormSuccess("Pengajuan verifikasi berhasil dikirimkan ke Admin. Mohon tunggu proses tinjauan.");
+        setFormSuccess(res.message || "Pengajuan verifikasi berhasil dikirimkan ke Admin.");
+        setIsEditingVerification(false);
         if (sellerProfile && onVerificationSubmitted) {
           onVerificationSubmitted({
             ...sellerProfile,
@@ -251,6 +320,22 @@ export const PenjualVerificationView: React.FC<PenjualVerificationViewProps> = (
                   </div>
                 </div>
               )}
+
+              {/* Tombol Ajukan Ulang / Perbarui Berkas saat Pending */}
+              <div className="mt-4 pt-3 border-t border-amber-200/60 dark:border-white/10 flex items-center justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsEditingVerification(!isEditingVerification)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-[#111827] border border-amber-300 dark:border-amber-700/60 text-amber-900 dark:text-amber-200 hover:bg-amber-100/60 dark:hover:bg-amber-900/30 transition-colors cursor-pointer shadow-2xs"
+                >
+                  <EditIcon size={14} />
+                  <span>
+                    {isEditingVerification
+                      ? "Tutup Formulir Perbaikan"
+                      : "Perbarui / Ajukan Ulang Berkas"}
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -276,17 +361,43 @@ export const PenjualVerificationView: React.FC<PenjualVerificationViewProps> = (
 
       {currentStatus === "verified" && (
         <div className="p-5 sm:p-6 rounded-3xl bg-emerald-50/80 dark:bg-emerald-950/20 border border-emerald-200/80 dark:border-emerald-800/40 shadow-xs">
-          <div className="flex items-start gap-4">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
-              <CheckCircleIcon size={22} />
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="relative shrink-0">
+                <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center text-white font-bold text-lg shadow-sm ring-2 ring-red-500 ring-offset-2 dark:ring-offset-[#0c1220]">
+                  {sellerProfile?.name ? sellerProfile.name[0]?.toUpperCase() : "P"}
+                </div>
+                <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 px-1.5 py-0.2 rounded-xs bg-red-600 text-white text-[8px] font-black uppercase tracking-tight shadow-xs border border-white dark:border-[#0c1220] leading-none pointer-events-none select-none z-10">
+                  Mall
+                </span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm sm:text-base font-bold text-emerald-900 dark:text-emerald-200">
+                    Selamat! Toko Anda Telah Resmi Terverifikasi
+                  </h3>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-600 text-white shadow-2xs">
+                    Status: Mall
+                  </span>
+                </div>
+                <p className="text-xs text-emerald-800/90 dark:text-emerald-300/90 mt-1 leading-relaxed">
+                  Toko Anda telah memegang lencana <span className="font-bold">Official Verified Merchant</span> dengan bingkai profil eksklusif border merah <strong>"Mall"</strong>. Seluruh produk Anda kini mendapatkan prioritas rekomendasi dan kepercayaan pembeli tertinggi.
+                </p>
+              </div>
             </div>
-            <div className="min-w-0 flex-1">
-              <h3 className="text-sm sm:text-base font-bold text-emerald-900 dark:text-emerald-200">
-                Selamat! Toko Anda Telah Resmi Terverifikasi
-              </h3>
-              <p className="text-xs text-emerald-800/90 dark:text-emerald-300/90 mt-1 leading-relaxed">
-                Toko Anda telah memegang lencana <span className="font-bold">Official Verified Merchant</span>. Seluruh produk Anda kini mendapatkan prioritas rekomendasi dan kepercayaan pembeli tertinggi.
-              </p>
+
+            {/* Tombol Perbarui Data Verifikasi saat Verified */}
+            <div className="mt-3 sm:mt-0 self-end sm:self-center shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsEditingVerification(!isEditingVerification)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-[#111827] border border-emerald-300 dark:border-emerald-700/60 text-emerald-900 dark:text-emerald-200 hover:bg-emerald-100/60 dark:hover:bg-emerald-900/30 transition-colors cursor-pointer shadow-2xs"
+              >
+                <EditIcon size={14} />
+                <span>
+                  {isEditingVerification ? "Tutup Formulir" : "Perbarui Data Verifikasi"}
+                </span>
+              </button>
             </div>
           </div>
         </div>
@@ -299,20 +410,20 @@ export const PenjualVerificationView: React.FC<PenjualVerificationViewProps> = (
         </h2>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Benefit 1: Badge Centang Resmi */}
+          {/* Benefit 1: Badge Centang Resmi & Border Merah Mall */}
           <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#0c1220] border border-slate-200/80 dark:border-white/10 shadow-xs flex flex-col justify-between">
             <div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 mb-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/10 text-red-600 dark:text-red-400 mb-3">
                 <ShieldIcon size={20} />
               </div>
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Lencana Verifikasi Resmi
+                Border Merah "Mall" & Centang
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                Etalase dan kartu produk toko akan disematkan lencana centang verified untuk meningkatkan kepercayaan calon pembeli.
+                Foto profil toko disematkan bingkai border merah eksklusif dengan label <strong>"Mall"</strong> di border bawah serta lencana centang resmi.
               </p>
             </div>
-            <span className="mt-3 text-[11px] font-semibold text-blue-600 dark:text-blue-400">
+            <span className="mt-3 text-[11px] font-semibold text-red-600 dark:text-red-400">
               +300% Tingkat Kepercayaan
             </span>
           </div>
@@ -374,15 +485,27 @@ export const PenjualVerificationView: React.FC<PenjualVerificationViewProps> = (
       </div>
 
       {/* 4. Formulir Pengajuan Verifikasi ke Admin */}
-      {currentStatus !== "verified" && currentStatus !== "pending" && (
+      {(currentStatus === "unverified" ||
+        currentStatus === "rejected" ||
+        isEditingVerification) && (
         <div className="rounded-3xl border border-slate-200/90 dark:border-white/10 bg-white dark:bg-[#0c1220] p-6 sm:p-8 shadow-sm">
           <div className="mb-6 pb-4 border-b border-slate-200/80 dark:border-white/10 flex items-center justify-between">
             <div>
               <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
-                Formulir Pengajuan Verifikasi Toko
+                {currentStatus === "rejected"
+                  ? "Formulir Pengajuan Ulang Verifikasi"
+                  : currentStatus === "pending"
+                  ? "Formulir Pembaruan Berkas Verifikasi"
+                  : currentStatus === "verified"
+                  ? "Formulir Pembaruan Data Toko"
+                  : "Formulir Pengajuan Verifikasi Toko"}
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Isi data penanggung jawab dan identitas legal usaha Anda untuk ditinjau oleh Administrator.
+                {currentStatus === "rejected"
+                  ? "Perbaiki data atau foto dokumen yang diminta admin untuk diverifikasi ulang."
+                  : currentStatus === "pending"
+                  ? "Anda dapat memperbarui data atau mengganti dokumen sebelum diproses oleh admin."
+                  : "Isi data penanggung jawab dan identitas legal usaha Anda untuk ditinjau oleh Administrator."}
               </p>
             </div>
             <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
@@ -612,7 +735,15 @@ export const PenjualVerificationView: React.FC<PenjualVerificationViewProps> = (
                 ) : (
                   <>
                     <ShieldIcon size={14} />
-                    <span>Kirim Pengajuan Verifikasi ke Admin</span>
+                    <span>
+                      {currentStatus === "rejected"
+                        ? "Kirim Ulang Verifikasi ke Admin"
+                        : currentStatus === "pending"
+                        ? "Perbarui & Kirim Ulang ke Admin"
+                        : currentStatus === "verified"
+                        ? "Simpan & Ajukan Pembaruan"
+                        : "Kirim Pengajuan Verifikasi ke Admin"}
+                    </span>
                   </>
                 )}
               </button>

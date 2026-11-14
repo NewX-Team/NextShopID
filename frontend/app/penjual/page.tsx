@@ -167,9 +167,22 @@ export default function PenjualPage() {
             </Link>
 
             {/* Profil Penjual Ringkas */}
-            <div className="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-white/10">
-              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center text-white font-bold text-xs shadow-xs">
-                {user?.name ? user.name[0]?.toUpperCase() : "P"}
+            <div className="flex items-center gap-2.5 pl-2 border-l border-slate-200 dark:border-white/10">
+              <div className="relative shrink-0">
+                <div
+                  className={`h-8 w-8 rounded-lg bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center text-white font-bold text-xs shadow-xs transition-all ${
+                    sellerProfile?.verificationStatus === "verified"
+                      ? "ring-2 ring-red-500 ring-offset-1 dark:ring-offset-[#070b14]"
+                      : ""
+                  }`}
+                >
+                  {user?.name ? user.name[0]?.toUpperCase() : "P"}
+                </div>
+                {sellerProfile?.verificationStatus === "verified" && (
+                  <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 px-1 py-0.2 rounded-xs bg-red-600 text-white text-[7.5px] font-black uppercase tracking-tight shadow-xs border border-white dark:border-[#070b14] leading-none pointer-events-none select-none z-10">
+                    Mall
+                  </span>
+                )}
               </div>
               <div className="hidden lg:block text-left">
                 <p className="text-xs font-bold text-slate-900 dark:text-white leading-none">

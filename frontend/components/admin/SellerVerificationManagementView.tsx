@@ -566,13 +566,24 @@ export const SellerVerificationManagementView: React.FC<
                   <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
                     {/* Kolom 1: Profil Toko & Status */}
                     <div className="flex items-start gap-3.5 min-w-0 flex-1">
-                      <div className="relative">
-                        <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center text-white font-bold text-base shadow-xs shrink-0">
+                      <div className="relative shrink-0">
+                        <div
+                          className={`h-11 w-11 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center text-white font-bold text-base shadow-xs transition-all ${
+                            isVerified
+                              ? "ring-2 ring-red-500 ring-offset-1 dark:ring-offset-[#111827]"
+                              : ""
+                          }`}
+                        >
                           {seller.name[0]?.toUpperCase() || "T"}
                         </div>
-                        {/* Dot indicator buka/tutup toko */}
+                        {isVerified && (
+                          <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 px-1.5 py-0.2 rounded-xs bg-red-600 text-white text-[7.5px] font-black uppercase tracking-tight shadow-xs border border-white dark:border-[#111827] leading-none pointer-events-none select-none z-10">
+                            Mall
+                          </span>
+                        )}
+                        {/* Dot indicator buka/tutup toko diposisikan di top-right agar tidak bertabrakan dengan badge Mall di border bawah */}
                         <span
-                          className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white dark:border-[#111827] ${
+                          className={`absolute -top-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white dark:border-[#111827] ${
                             seller.isStoreOpen ? "bg-emerald-500" : "bg-slate-400"
                           }`}
                           title={seller.isStoreOpen ? "Toko Buka" : "Toko Libur"}
@@ -758,8 +769,21 @@ export const SellerVerificationManagementView: React.FC<
             {/* Header Modal */}
             <div className="flex items-start justify-between pb-4 mb-4 border-b border-slate-200/80 dark:border-white/10">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center text-white font-bold text-base shadow-xs">
-                  {selectedSeller.name[0]?.toUpperCase() || "T"}
+                <div className="relative shrink-0">
+                  <div
+                    className={`h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center text-white font-bold text-base shadow-xs transition-all ${
+                      selectedSeller.verificationStatus === "verified"
+                        ? "ring-2 ring-red-500 ring-offset-1 dark:ring-offset-[#111827]"
+                        : ""
+                    }`}
+                  >
+                    {selectedSeller.name[0]?.toUpperCase() || "T"}
+                  </div>
+                  {selectedSeller.verificationStatus === "verified" && (
+                    <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 px-1.5 py-0.2 rounded-xs bg-red-600 text-white text-[7.5px] font-black uppercase tracking-tight shadow-xs border border-white dark:border-[#111827] leading-none pointer-events-none select-none z-10">
+                      Mall
+                    </span>
+                  )}
                 </div>
                 <div>
                   <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
