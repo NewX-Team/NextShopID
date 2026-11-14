@@ -31,9 +31,9 @@ npm run dev
 ```
 
 * **Frontend Web**: [http://localhost:3000](http://localhost:3000)
-* **Backend API**: [http://localhost:5001/api](http://localhost:5001/api)
-* **Swagger API Docs**: [http://localhost:5001/api/docs](http://localhost:5001/api/docs)
-* **OpenAPI 3.0 JSON Spec**: [http://localhost:5001/api/docs.json](http://localhost:5001/api/docs.json)
+* **Backend API**: [http://localhost:5000/api](http://localhost:5000/api)
+* **Swagger API Docs**: [http://localhost:5000/api/docs](http://localhost:5000/api/docs)
+* **OpenAPI 3.0 JSON Spec**: [http://localhost:5000/api/docs.json](http://localhost:5000/api/docs.json)
 
 ---
 

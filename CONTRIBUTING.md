@@ -10,7 +10,7 @@ NextShopID menggunakan pola monorepo dengan 2 server terpisah yang dijalankan be
 
 ```text
 NextShopID/
-├── backend/          # REST API Server murni (Express + TypeScript + SQLite) -> Port 5001
+├── backend/          # REST API Server murni (Express + TypeScript + SQLite) -> Port 5000
 │   ├── src/          # Source code backend (app.ts, routes, controllers, services)
 │   └── tests/        # Unit & Integration test suites (Vitest + Supertest)
 ├── frontend/         # Web Client UI (Next.js 15+ App Router + React + TypeScript) -> Port 3000
@@ -21,8 +21,8 @@ NextShopID/
 ### Menjalankan Proyek & Perintah Utama di Root
 * **`npm run dev`**: Menjalankan backend dan frontend sekaligus di satu terminal via `concurrently`.
   * Frontend Web: [http://localhost:3000](http://localhost:3000)
-  * Backend API: [http://localhost:5001/api](http://localhost:5001/api)
-  * Swagger Docs: [http://localhost:5001/api/docs](http://localhost:5001/api/docs)
+  * Backend API: [http://localhost:5000/api](http://localhost:5000/api)
+  * Swagger Docs: [http://localhost:5000/api/docs](http://localhost:5000/api/docs)
 * **`npm run tests`**: Menjalankan seluruh rangkaian unit & integration tests (backend dan frontend) untuk memverifikasi fungsionalitas sebelum commit/PR.
 * **`npm run build`**: Memverifikasi kompilasi TypeScript dan linting tanpa error (`0 errors, 0 warnings`).
 

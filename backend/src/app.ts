@@ -12,7 +12,12 @@ initDatabase();
 export const app = express();
 
 // Global Middlewares
-app.use(cors());
+app.use(
+  cors({
+    origin: true,
+    credentials: true,
+  })
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

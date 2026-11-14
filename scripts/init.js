@@ -74,7 +74,7 @@ function getBackendPort() {
     const match = content.match(/^PORT\s*=\s*(\d+)/m);
     if (match) return match[1];
   }
-  return "5001";
+  return "5000";
 }
 
 function getFrontendPort() {
