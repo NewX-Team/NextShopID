@@ -6,6 +6,7 @@
  * - 'user'    : Pembeli / Pelanggan e-commerce
  */
 export type UserRole = "admin" | "penjual" | "user";
+export type UserStatus = "active" | "suspended";
 
 export interface User {
   id: number;
@@ -14,6 +15,8 @@ export interface User {
   email: string;
   password: string;
   role: UserRole;
+  status: UserStatus;
+  suspension_reason?: string | null;
   created_at: string;
   updated_at: string;
 }

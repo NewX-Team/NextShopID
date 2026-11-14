@@ -9,7 +9,9 @@ router.use(authenticate, requireRole(["admin"]));
 
 // Manajemen Pengguna
 router.get("/users", adminController.getUsers.bind(adminController));
+router.patch("/users/bulk-status", adminController.updateUsersBulkStatus.bind(adminController));
 router.patch("/users/:id/role", adminController.updateUserRole.bind(adminController));
+router.patch("/users/:id/status", adminController.updateUserStatus.bind(adminController));
 router.delete("/users/:id", adminController.deleteUser.bind(adminController));
 
 // Kontrol On/Off Server

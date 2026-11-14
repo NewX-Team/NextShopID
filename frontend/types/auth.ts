@@ -8,6 +8,7 @@
  */
 
 export type UserRole = "admin" | "penjual" | "user";
+export type UserStatus = "active" | "suspended";
 
 export interface User {
   id: string | number;
@@ -15,6 +16,8 @@ export interface User {
   username: string;
   email: string;
   role?: UserRole;
+  status?: UserStatus;
+  suspension_reason?: string | null;
 }
 
 export interface LoginInput {

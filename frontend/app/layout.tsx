@@ -5,6 +5,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { ServerStatusProvider } from "@/context/ServerStatusContext";
 import { AdminAccessGuard } from "@/components/auth/AdminAccessGuard";
 import { ServerOfflineModal } from "@/components/maintenance/ServerOfflineModal";
+import { AccountSuspendedModal } from "@/components/maintenance/AccountSuspendedModal";
 import { Navbar } from "@/components/layout/Navbar";
 
 export const metadata: Metadata = {
@@ -27,6 +28,7 @@ export default function RootLayout({
                 <Navbar />
                 <div className="flex flex-1 flex-col">{children}</div>
                 <ServerOfflineModal />
+                <AccountSuspendedModal />
               </AdminAccessGuard>
             </ServerStatusProvider>
           </AuthProvider>

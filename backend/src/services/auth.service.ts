@@ -110,7 +110,7 @@ export class AuthService {
    */
   getUserById(id: number): SafeUser | null {
     const stmt = db.prepare(`
-      SELECT id, name, username, email, role, created_at, updated_at
+      SELECT id, name, username, email, role, status, suspension_reason, created_at, updated_at
       FROM users
       WHERE id = ?
     `);

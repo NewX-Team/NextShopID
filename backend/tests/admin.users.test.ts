@@ -160,4 +160,106 @@ describe("Admin User Management API - GET /api/admin/users & Actions", () => {
     const checkOn = await request(app).get("/api/system/status");
     expect(checkOn.body.serverActive).toBe(true);
   });
+
+  it("admin harus dapat membekukan dan mengaktifkan kembali akun pengguna", async () => {
+    // Buat akun baru untuk diuji pembekuan
+    const regRes = await request(app).post("/api/auth/register").send({
+      name: "User Uji Bekukan",
+      username: "userbeku_" + Date.now(),
+      email: "userbeku_" + Date.now() + "@gmail.com",
+      password: "password123",
+    });
+    expect(regRes.status).toBe(201);
+    const userId = regRes.body.user.id;
+
+    // Bekukan akun dengan alasan spesifik
+    const suspendRes = await request(app)
+      .patch(`/api/admin/users/${userId}/status`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        status: "suspended",
+        reason: "Aktivitas Mencurigakan: Anomali checkout bot",
+      });
+
+    expect(suspendRes.status).toBe(200);
+    expect(suspendRes.body.success).toBe(true);
+    expect(suspendRes.body.user.status).toBe("suspended");
+    expect(suspendRes.body.user.suspension_reason).toBe(
+      "Aktivitas Mencurigakan: Anomali checkout bot"
+    );
+
+    // Aktifkan kembali akun
+    const activateRes = await request(app)
+      .patch(`/api/admin/users/${userId}/status`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ status: "active" });
+
+    expect(activateRes.status).toBe(200);
+    expect(activateRes.body.success).toBe(true);
+    expect(activateRes.body.user.status).toBe("active");
+
+    // Superadmin #1 tidak boleh dibekukan
+    const rootAdminRes = await request(app)
+      .patch("/api/admin/users/1/status")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ status: "suspended" });
+
+    expect(rootAdminRes.status).toBe(403);
+    expect(rootAdminRes.body.success).toBe(false);
+
+    // Bersihkan user uji
+    await request(app)
+      .delete(`/api/admin/users/${userId}`)
+      .set("Authorization", `Bearer ${adminToken}`);
+  });
+
+  it("admin harus dapat mengubah status akun secara massal (bulk status update)", async () => {
+    // Buat 2 akun dummy untuk pengujian massal
+    const userA = await request(app).post("/api/auth/register").send({
+      name: "Bulk User A",
+      username: "bulka_" + Date.now(),
+      email: "bulka_" + Date.now() + "@gmail.com",
+      password: "password123",
+    });
+    const userB = await request(app).post("/api/auth/register").send({
+      name: "Bulk User B",
+      username: "bulkb_" + Date.now(),
+      email: "bulkb_" + Date.now() + "@gmail.com",
+      password: "password123",
+    });
+
+    const idA = userA.body.user.id;
+    const idB = userB.body.user.id;
+
+    // Bekukan kedua akun secara massal
+    const bulkSuspendRes = await request(app)
+      .patch("/api/admin/users/bulk-status")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        userIds: [idA, idB, 1], // id 1 harus otomatis difilter demi keamanan
+        status: "suspended",
+        reason: "Aktivitas Mencurigakan - Bulk Test",
+      });
+
+    expect(bulkSuspendRes.status).toBe(200);
+    expect(bulkSuspendRes.body.success).toBe(true);
+    expect(bulkSuspendRes.body.updatedCount).toBe(2);
+
+    // Aktifkan kembali secara massal
+    const bulkActiveRes = await request(app)
+      .patch("/api/admin/users/bulk-status")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        userIds: [idA, idB],
+        status: "active",
+      });
+
+    expect(bulkActiveRes.status).toBe(200);
+    expect(bulkActiveRes.body.success).toBe(true);
+    expect(bulkActiveRes.body.updatedCount).toBe(2);
+
+    // Bersihkan akun dummy
+    await request(app).delete(`/api/admin/users/${idA}`).set("Authorization", `Bearer ${adminToken}`);
+    await request(app).delete(`/api/admin/users/${idB}`).set("Authorization", `Bearer ${adminToken}`);
+  });
 });

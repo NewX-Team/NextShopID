@@ -79,6 +79,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => window.removeEventListener("storage", handleStorageChange);
   }, []);
 
+  // Sinkronisasi status profil akun secara berkala (setiap 5 detik untuk non-admin)
+  // guna mendeteksi pembekuan akun (suspension) oleh admin secara realtime
+  useEffect(() => {
+    if (!token || user?.role === "admin") return;
+
+    const checkInterval = setInterval(async () => {
+      try {
+        const res = await authService.getProfile(token);
+        if (res.success && res.user) {
+          setUser(res.user);
+          localStorage.setItem("user", JSON.stringify(res.user));
+        }
+      } catch {
+        // Abaikan error jaringan sementara
+      }
+    }, 5000);
+
+    return () => clearInterval(checkInterval);
+  }, [token, user?.role]);
+
   const login = useCallback((newToken: string, newUser: User) => {
     try {
       localStorage.setItem("token", newToken);

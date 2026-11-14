@@ -53,7 +53,7 @@ export function initDatabase(): void {
       console.log("[Database] Migrasi schema users selesai.");
     }
   } else {
-    // Buat tabel users baru dengan dukungan role admin, penjual, dan user
+    // Buat tabel users baru dengan dukungan role admin, penjual, dan user serta status akun
     db.exec(`
       CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -62,6 +62,8 @@ export function initDatabase(): void {
         email TEXT UNIQUE NOT NULL,
         password TEXT NOT NULL,
         role TEXT NOT NULL CHECK(role IN ('admin', 'penjual', 'user')) DEFAULT 'user',
+        status TEXT NOT NULL CHECK(status IN ('active', 'suspended')) DEFAULT 'active',
+        suspension_reason TEXT DEFAULT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
@@ -69,6 +71,17 @@ export function initDatabase(): void {
       CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
     `);
+  }
+
+  // Pastikan kolom 'status' & 'suspension_reason' ada jika tabel dibuat dari versi sebelumnya
+  const userColumns = db.prepare("PRAGMA table_info(users)").all() as unknown as Array<{ name: string }>;
+  if (!userColumns.some((c) => c.name === "status")) {
+    db.exec("ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active';");
+    console.log("[Database] Kolom 'status' berhasil ditambahkan ke tabel users.");
+  }
+  if (!userColumns.some((c) => c.name === "suspension_reason")) {
+    db.exec("ALTER TABLE users ADD COLUMN suspension_reason TEXT DEFAULT NULL;");
+    console.log("[Database] Kolom 'suspension_reason' berhasil ditambahkan ke tabel users.");
   }
 
   // 2. Inisialisasi tabel token reset kata sandi

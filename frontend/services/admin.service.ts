@@ -1,4 +1,4 @@
-import { User, UserRole } from "@/types/auth";
+import { User, UserRole, UserStatus } from "@/types/auth";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
@@ -8,6 +8,8 @@ export interface AdminUserItem {
   username: string;
   email: string;
   role: UserRole;
+  status: UserStatus;
+  suspension_reason?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -17,6 +19,8 @@ export interface AdminUserStats {
   totalPembeli: number;
   totalPenjual: number;
   totalAdmin: number;
+  totalActive?: number;
+  totalSuspended?: number;
 }
 
 export interface AdminGetUsersResponse {
@@ -51,6 +55,7 @@ export const adminService = {
     filters?: {
       search?: string;
       role?: string;
+      status?: string;
       sort?: string;
     }
   ): Promise<AdminGetUsersResponse> {
@@ -58,6 +63,7 @@ export const adminService = {
       const queryParams = new URLSearchParams();
       if (filters?.search) queryParams.set("search", filters.search);
       if (filters?.role && filters.role !== "all") queryParams.set("role", filters.role);
+      if (filters?.status && filters.status !== "all") queryParams.set("status", filters.status);
       if (filters?.sort) queryParams.set("sort", filters.sort);
 
       const qs = queryParams.toString();
@@ -148,6 +154,67 @@ export const adminService = {
       return {
         success: false,
         message: "Gagal terhubung ke server saat menghapus akun.",
+      };
+    }
+  },
+
+  /**
+   * Mengubah status aktif/dibekukan akun pengguna: PATCH /api/admin/users/:id/status
+   */
+  async updateUserStatus(
+    token: string,
+    userId: number,
+    status: UserStatus,
+    reason?: string
+  ): Promise<{ success: boolean; message?: string; user?: { id: number; status: UserStatus } }> {
+    try {
+      const response = await fetch(`${API_URL}/admin/users/${userId}/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status, reason }),
+      });
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error("[adminService.updateUserStatus] Error:", error);
+      return {
+        success: false,
+        message: "Gagal terhubung ke server saat memperbarui status akun.",
+      };
+    }
+  },
+
+  /**
+   * Mengubah status banyak akun sekaligus secara sistematis (Bulk Status Update)
+   * PATCH /api/admin/users/bulk-status
+   */
+  async updateUsersBulkStatus(
+    token: string,
+    userIds: number[],
+    status: UserStatus,
+    reason?: string
+  ): Promise<{ success: boolean; message?: string; updatedCount?: number }> {
+    try {
+      const response = await fetch(`${API_URL}/admin/users/bulk-status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ userIds, status, reason }),
+      });
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error("[adminService.updateUsersBulkStatus] Error:", error);
+      return {
+        success: false,
+        message: "Gagal terhubung ke server saat memperbarui status akun massal.",
       };
     }
   },
