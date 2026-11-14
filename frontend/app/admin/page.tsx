@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useServerStatus } from "@/context/ServerStatusContext";
 import { adminService } from "@/services/admin.service";
 import { AdminSidebar, AdminMenuKey } from "@/components/admin/AdminSidebar";
 import { UserManagementView } from "@/components/admin/UserManagementView";
+import { SellerVerificationManagementView } from "@/components/admin/SellerVerificationManagementView";
 import {
   DashboardIcon,
   ShoppingBagIcon,
@@ -16,6 +17,7 @@ import {
   DollarSignIcon,
   PercentIcon,
   SettingsIcon,
+  UserCheckIcon,
 } from "@/components/ui/icons";
 
 interface MenuMeta {
@@ -61,6 +63,13 @@ const MENU_METAS: Record<AdminMenuKey, MenuMeta> = {
       "Kelola data akun pembeli, verifikasi pendaftaran akun merchant/penjual baru, dan manajemen status akun.",
     icon: UsersIcon,
   },
+  verifikasi_penjual: {
+    title: "Verifikasi Penjual",
+    badge: "Kelayakan Merchant",
+    description:
+      "Audit identitas toko dan pemilik usaha, berikan persetujuan lencana terverifikasi (ACC), atau tolak dengan alasan terperinci.",
+    icon: UserCheckIcon,
+  },
   keuangan: {
     title: "Laporan Keuangan",
     badge: "Settlement & Komisi",
@@ -91,6 +100,26 @@ export default function AdminPage() {
 
   const [activeMenu, setActiveMenu] = useState<AdminMenuKey>("pengguna");
   const [isTogglingServer, setIsTogglingServer] = useState<boolean>(false);
+  const [pendingVerificationsCount, setPendingVerificationsCount] = useState<number>(0);
+
+  // Ambil jumlah pending verifikasi penjual realtime
+  const fetchPendingVerificationsCount = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await adminService.getVerifications(token, { status: "pending" });
+      if (res.success && res.stats) {
+        setPendingVerificationsCount(res.stats.pendingCount);
+      }
+    } catch (err) {
+      console.error("[AdminPage] Gagal memuat statistik pending verifikasi:", err);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    if (isAuthenticated && user?.role === "admin") {
+      fetchPendingVerificationsCount();
+    }
+  }, [isAuthenticated, user?.role, fetchPendingVerificationsCount]);
 
   // Handler toggle server ON / OFF yang tersinkronisasi ke backend
   const handleToggleServer = async () => {
@@ -147,6 +176,7 @@ export default function AdminPage() {
         onSelectMenu={setActiveMenu}
         onLogout={handleLogout}
         isServerActive={isServerActive}
+        pendingVerificationsCount={pendingVerificationsCount}
       />
 
       {/* 2. Konten Utama di Sisi Kanan */}
@@ -230,11 +260,17 @@ export default function AdminPage() {
           </div>
         </header>
 
-        {/* Canvas Body: Manajemen Pengguna atau Placeholder Menu */}
+        {/* Canvas Body: Manajemen Pengguna, Verifikasi Penjual, atau Placeholder Menu */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8">
           <div className="max-w-7xl mx-auto">
             {activeMenu === "pengguna" ? (
               <UserManagementView />
+            ) : activeMenu === "verifikasi_penjual" ? (
+              <SellerVerificationManagementView
+                onStatsUpdate={(latestStats) => {
+                  setPendingVerificationsCount(latestStats.pendingCount);
+                }}
+              />
             ) : (
               <div className="py-12 flex flex-col items-center justify-center text-center">
                 {/* Kartu Hero Placeholder Menu */}

@@ -46,6 +46,58 @@ export interface AdminUpdateRoleResponse {
   };
 }
 
+export type VerificationDecision = "approve" | "reject" | "pending";
+
+export interface AdminSellerVerificationItem {
+  id: number;
+  name: string;
+  username: string;
+  email: string;
+  role: string;
+  status: string;
+  suspensionReason?: string | null;
+  isStoreOpen: boolean;
+  storeBalance: number;
+  verificationStatus: "unverified" | "pending" | "verified" | "rejected";
+  verificationSubmittedAt: string | null;
+  verificationData: {
+    ownerName?: string;
+    idCardNumber?: string;
+    phoneNumber?: string;
+    businessType?: string;
+    storeDescription?: string;
+    idCardPhoto?: string;
+    selfiePhoto?: string;
+    businessDocPhoto?: string;
+    notes?: string;
+  } | null;
+  verificationRejectionReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminVerificationStats {
+  totalPenjual: number;
+  pendingCount: number;
+  verifiedCount: number;
+  rejectedCount: number;
+  unverifiedCount: number;
+}
+
+export interface AdminGetVerificationsResponse {
+  success: boolean;
+  message?: string;
+  data: AdminSellerVerificationItem[];
+  stats: AdminVerificationStats;
+}
+
+export interface AdminUpdateVerificationDecisionResponse {
+  success: boolean;
+  message?: string;
+  seller?: AdminSellerVerificationItem;
+  stats?: AdminVerificationStats;
+}
+
 export const adminService = {
   /**
    * Mengambil seluruh data pengguna dari endpoint GET /api/admin/users
@@ -400,6 +452,102 @@ export const adminService = {
         success: false,
         serverActive: active,
         message: "Gagal memperbarui status server.",
+      };
+    }
+  },
+
+  /**
+   * Mengambil daftar seluruh verifikasi penjual dari endpoint GET /api/admin/verifications
+   */
+  async getVerifications(
+    token: string,
+    filters?: {
+      search?: string;
+      status?: string;
+      sort?: string;
+    }
+  ): Promise<AdminGetVerificationsResponse> {
+    try {
+      const queryParams = new URLSearchParams();
+      if (filters?.search) queryParams.set("search", filters.search);
+      if (filters?.status && filters.status !== "all") queryParams.set("status", filters.status);
+      if (filters?.sort) queryParams.set("sort", filters.sort);
+
+      const qs = queryParams.toString();
+      const url = `${API_URL}/admin/verifications${qs ? `?${qs}` : ""}`;
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        return {
+          success: false,
+          message: result.message || "Gagal mengambil data verifikasi penjual.",
+          data: [],
+          stats: {
+            totalPenjual: 0,
+            pendingCount: 0,
+            verifiedCount: 0,
+            rejectedCount: 0,
+            unverifiedCount: 0,
+          },
+        };
+      }
+
+      return result;
+    } catch (error) {
+      console.error("[adminService.getVerifications] Error:", error);
+      return {
+        success: false,
+        message: "Gagal terhubung ke backend server.",
+        data: [],
+        stats: {
+          totalPenjual: 0,
+          pendingCount: 0,
+          verifiedCount: 0,
+          rejectedCount: 0,
+          unverifiedCount: 0,
+        },
+      };
+    }
+  },
+
+  /**
+   * Mengatur keputusan verifikasi penjual (ACC, Tolak dengan alasan, atau Pending)
+   * PATCH /api/admin/verifications/:id/decision
+   */
+  async updateVerificationDecision(
+    token: string,
+    sellerId: number,
+    payload: {
+      decision: VerificationDecision;
+      reason?: string;
+    }
+  ): Promise<AdminUpdateVerificationDecisionResponse> {
+    try {
+      const response = await fetch(`${API_URL}/admin/verifications/${sellerId}/decision`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error("[adminService.updateVerificationDecision] Error:", error);
+      return {
+        success: false,
+        message: "Gagal memproses keputusan verifikasi penjual.",
       };
     }
   },

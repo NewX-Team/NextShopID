@@ -73,7 +73,7 @@ export function initDatabase(): void {
     `);
   }
 
-  // Pastikan kolom 'status' & 'suspension_reason' ada jika tabel dibuat dari versi sebelumnya
+  // Pastikan kolom 'status', 'suspension_reason', 'is_store_open', & 'store_balance' ada jika tabel dibuat dari versi sebelumnya
   const userColumns = db.prepare("PRAGMA table_info(users)").all() as unknown as Array<{ name: string }>;
   if (!userColumns.some((c) => c.name === "status")) {
     db.exec("ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active';");
@@ -82,6 +82,30 @@ export function initDatabase(): void {
   if (!userColumns.some((c) => c.name === "suspension_reason")) {
     db.exec("ALTER TABLE users ADD COLUMN suspension_reason TEXT DEFAULT NULL;");
     console.log("[Database] Kolom 'suspension_reason' berhasil ditambahkan ke tabel users.");
+  }
+  if (!userColumns.some((c) => c.name === "is_store_open")) {
+    db.exec("ALTER TABLE users ADD COLUMN is_store_open INTEGER NOT NULL DEFAULT 1;");
+    console.log("[Database] Kolom 'is_store_open' berhasil ditambahkan ke tabel users.");
+  }
+  if (!userColumns.some((c) => c.name === "store_balance")) {
+    db.exec("ALTER TABLE users ADD COLUMN store_balance REAL NOT NULL DEFAULT 0;");
+    console.log("[Database] Kolom 'store_balance' berhasil ditambahkan ke tabel users.");
+  }
+  if (!userColumns.some((c) => c.name === "verification_status")) {
+    db.exec("ALTER TABLE users ADD COLUMN verification_status TEXT NOT NULL DEFAULT 'unverified';");
+    console.log("[Database] Kolom 'verification_status' berhasil ditambahkan ke tabel users.");
+  }
+  if (!userColumns.some((c) => c.name === "verification_submitted_at")) {
+    db.exec("ALTER TABLE users ADD COLUMN verification_submitted_at DATETIME DEFAULT NULL;");
+    console.log("[Database] Kolom 'verification_submitted_at' berhasil ditambahkan ke tabel users.");
+  }
+  if (!userColumns.some((c) => c.name === "verification_data")) {
+    db.exec("ALTER TABLE users ADD COLUMN verification_data TEXT DEFAULT NULL;");
+    console.log("[Database] Kolom 'verification_data' berhasil ditambahkan ke tabel users.");
+  }
+  if (!userColumns.some((c) => c.name === "verification_rejection_reason")) {
+    db.exec("ALTER TABLE users ADD COLUMN verification_rejection_reason TEXT DEFAULT NULL;");
+    console.log("[Database] Kolom 'verification_rejection_reason' berhasil ditambahkan ke tabel users.");
   }
 
   // 2. Inisialisasi tabel token reset kata sandi

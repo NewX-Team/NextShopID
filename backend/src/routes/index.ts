@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { authRoutes } from "./auth.routes";
 import { adminRoutes } from "./admin.routes";
+import { sellerRoutes } from "./seller.routes";
 import { isServerActive } from "../config/database";
 
 /**
@@ -12,6 +13,7 @@ const apiRouter = Router();
 
 apiRouter.use("/auth", authRoutes);
 apiRouter.use("/admin", adminRoutes);
+apiRouter.use("/seller", sellerRoutes);
 
 // Endpoint Publik Status Server (bisa dicek secara realtime oleh frontend)
 apiRouter.get("/system/status", (_req, res) => {

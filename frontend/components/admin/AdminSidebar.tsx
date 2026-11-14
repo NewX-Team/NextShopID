@@ -18,6 +18,7 @@ import {
   ShieldIcon,
   MenuIcon,
   CloseIcon,
+  UserCheckIcon,
 } from "@/components/ui/icons";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
@@ -27,6 +28,7 @@ export type AdminMenuKey =
   | "produk"
   | "pesanan"
   | "pengguna"
+  | "verifikasi_penjual"
   | "kategori"
   | "keuangan"
   | "promo"
@@ -37,6 +39,7 @@ interface AdminSidebarProps {
   onSelectMenu: (menu: AdminMenuKey) => void;
   onLogout: () => void;
   isServerActive?: boolean;
+  pendingVerificationsCount?: number;
 }
 
 interface MenuItemDef {
@@ -52,89 +55,95 @@ interface MenuGroupDef {
   items: MenuItemDef[];
 }
 
-const MENU_GROUPS: MenuGroupDef[] = [
-  {
-    title: "Menu Utama",
-    items: [
-      {
-        key: "dashboard",
-        label: "Dashboard",
-        icon: DashboardIcon,
-      },
-    ],
-  },
-  {
-    title: "Katalog & Transaksi",
-    items: [
-      {
-        key: "produk",
-        label: "Manajemen Produk",
-        icon: ShoppingBagIcon,
-        badge: "4",
-        badgeColor: "amber",
-      },
-      {
-        key: "pesanan",
-        label: "Manajemen Pesanan",
-        icon: PackageIcon,
-        badge: "12",
-        badgeColor: "blue",
-      },
-      {
-        key: "kategori",
-        label: "Kategori Produk",
-        icon: LayersIcon,
-      },
-    ],
-  },
-  {
-    title: "Pengguna & Merchant",
-    items: [
-      {
-        key: "pengguna",
-        label: "Manajemen Pengguna",
-        icon: UsersIcon,
-        badge: "3",
-        badgeColor: "emerald",
-      },
-    ],
-  },
-  {
-    title: "Finansial & Pemasaran",
-    items: [
-      {
-        key: "keuangan",
-        label: "Laporan Keuangan",
-        icon: DollarSignIcon,
-      },
-      {
-        key: "promo",
-        label: "Promo & Voucher",
-        icon: PercentIcon,
-      },
-    ],
-  },
-  {
-    title: "Sistem",
-    items: [
-      {
-        key: "pengaturan",
-        label: "Pengaturan Platform",
-        icon: SettingsIcon,
-      },
-    ],
-  },
-];
-
 export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   activeMenu,
   onSelectMenu,
   onLogout,
   isServerActive = true,
+  pendingVerificationsCount = 0,
 }) => {
   const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  const menuGroups: MenuGroupDef[] = [
+    {
+      title: "Menu Utama",
+      items: [
+        {
+          key: "dashboard",
+          label: "Dashboard",
+          icon: DashboardIcon,
+        },
+      ],
+    },
+    {
+      title: "Katalog & Transaksi",
+      items: [
+        {
+          key: "produk",
+          label: "Manajemen Produk",
+          icon: ShoppingBagIcon,
+          badge: "4",
+          badgeColor: "amber",
+        },
+        {
+          key: "pesanan",
+          label: "Manajemen Pesanan",
+          icon: PackageIcon,
+          badge: "12",
+          badgeColor: "blue",
+        },
+        {
+          key: "kategori",
+          label: "Kategori Produk",
+          icon: LayersIcon,
+        },
+      ],
+    },
+    {
+      title: "Pengguna & Merchant",
+      items: [
+        {
+          key: "pengguna",
+          label: "Manajemen Pengguna",
+          icon: UsersIcon,
+        },
+        {
+          key: "verifikasi_penjual",
+          label: "Verifikasi Penjual",
+          icon: UserCheckIcon,
+          badge: pendingVerificationsCount > 0 ? `${pendingVerificationsCount}` : undefined,
+          badgeColor: "amber",
+        },
+      ],
+    },
+    {
+      title: "Finansial & Pemasaran",
+      items: [
+        {
+          key: "keuangan",
+          label: "Laporan Keuangan",
+          icon: DollarSignIcon,
+        },
+        {
+          key: "promo",
+          label: "Promo & Voucher",
+          icon: PercentIcon,
+        },
+      ],
+    },
+    {
+      title: "Sistem",
+      items: [
+        {
+          key: "pengaturan",
+          label: "Pengaturan Platform",
+          icon: SettingsIcon,
+        },
+      ],
+    },
+  ];
 
   const renderBadge = (badge?: string, color: "blue" | "amber" | "emerald" = "blue") => {
     if (!badge) return null;
@@ -187,7 +196,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
 
         {/* Grup Menu Navigasi Admin */}
         <nav className="space-y-6">
-          {MENU_GROUPS.map((group) => (
+          {menuGroups.map((group) => (
             <div key={group.title}>
               <p className="px-3 mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">
                 {group.title}

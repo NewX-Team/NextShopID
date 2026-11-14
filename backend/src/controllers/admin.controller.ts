@@ -812,6 +812,291 @@ export class AdminController {
       });
     }
   }
+
+  /**
+   * Mengambil daftar seluruh penjual dan status verifikasi mereka (ACC, Tolak, Pending, Unverified)
+   * GET /api/admin/verifications
+   */
+  async getVerifications(req: Request, res: Response): Promise<void> {
+    try {
+      const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
+      const statusFilter = typeof req.query.status === "string" ? req.query.status.trim() : "all";
+      const sort = typeof req.query.sort === "string" ? req.query.sort.trim() : "newest";
+
+      // 1. Hitung statistik keseluruhan verifikasi penjual realtime
+      const statsStmt = db.prepare(`
+        SELECT 
+          COUNT(*) as totalPenjual,
+          SUM(CASE WHEN verification_status = 'pending' THEN 1 ELSE 0 END) as pendingCount,
+          SUM(CASE WHEN verification_status = 'verified' THEN 1 ELSE 0 END) as verifiedCount,
+          SUM(CASE WHEN verification_status = 'rejected' THEN 1 ELSE 0 END) as rejectedCount,
+          SUM(CASE WHEN verification_status = 'unverified' OR verification_status IS NULL THEN 1 ELSE 0 END) as unverifiedCount
+        FROM users
+        WHERE role = 'penjual'
+      `);
+
+      const statsResult = statsStmt.get() as unknown as {
+        totalPenjual: number;
+        pendingCount: number;
+        verifiedCount: number;
+        rejectedCount: number;
+        unverifiedCount: number;
+      };
+
+      // 2. Susun kueri pemfilteran
+      const conditions: string[] = ["role = 'penjual'"];
+      const params: (string | number)[] = [];
+
+      if (search) {
+        conditions.push("(name LIKE ? OR username LIKE ? OR email LIKE ? OR verification_data LIKE ?)");
+        const pattern = `%${search}%`;
+        params.push(pattern, pattern, pattern, pattern);
+      }
+
+      if (statusFilter && statusFilter !== "all") {
+        if (statusFilter === "unverified") {
+          conditions.push("(verification_status = 'unverified' OR verification_status IS NULL)");
+        } else if (["pending", "verified", "rejected"].includes(statusFilter)) {
+          conditions.push("verification_status = ?");
+          params.push(statusFilter);
+        }
+      }
+
+      const whereClause = `WHERE ${conditions.join(" AND ")}`;
+
+      let orderBy = "ORDER BY CASE WHEN verification_status = 'pending' THEN 0 ELSE 1 END, created_at DESC, id DESC";
+      if (sort === "submitted_newest") {
+        orderBy = "ORDER BY verification_submitted_at DESC, id DESC";
+      } else if (sort === "oldest") {
+        orderBy = "ORDER BY created_at ASC, id ASC";
+      } else if (sort === "name_asc") {
+        orderBy = "ORDER BY name COLLATE NOCASE ASC";
+      }
+
+      const query = `
+        SELECT 
+          id, name, username, email, role, status, suspension_reason,
+          is_store_open, store_balance, verification_status,
+          verification_submitted_at, verification_data,
+          verification_rejection_reason, created_at, updated_at
+        FROM users
+        ${whereClause}
+        ${orderBy}
+      `;
+
+      const listStmt = db.prepare(query);
+      const rows = listStmt.all(...params) as unknown as Array<{
+        id: number;
+        name: string;
+        username: string;
+        email: string;
+        role: string;
+        status: string;
+        suspension_reason: string | null;
+        is_store_open: number;
+        store_balance: number;
+        verification_status: string | null;
+        verification_submitted_at: string | null;
+        verification_data: string | null;
+        verification_rejection_reason: string | null;
+        created_at: string;
+        updated_at: string;
+      }>;
+
+      const sellers = rows.map((r) => {
+        let parsedData: any = null;
+        if (r.verification_data) {
+          try {
+            parsedData = JSON.parse(r.verification_data);
+          } catch {
+            parsedData = null;
+          }
+        }
+
+        return {
+          id: r.id,
+          name: r.name,
+          username: r.username,
+          email: r.email,
+          role: r.role,
+          status: r.status,
+          suspensionReason: r.suspension_reason,
+          isStoreOpen: r.is_store_open !== 0,
+          storeBalance: Number(r.store_balance || 0),
+          verificationStatus: r.verification_status || "unverified",
+          verificationSubmittedAt: r.verification_submitted_at,
+          verificationData: parsedData,
+          verificationRejectionReason: r.verification_rejection_reason,
+          createdAt: r.created_at,
+          updatedAt: r.updated_at,
+        };
+      });
+
+      res.json({
+        success: true,
+        message: "Data verifikasi penjual berhasil diambil.",
+        data: sellers,
+        stats: {
+          totalPenjual: statsResult.totalPenjual || 0,
+          pendingCount: statsResult.pendingCount || 0,
+          verifiedCount: statsResult.verifiedCount || 0,
+          rejectedCount: statsResult.rejectedCount || 0,
+          unverifiedCount: statsResult.unverifiedCount || 0,
+        },
+      });
+    } catch (error) {
+      console.error("[AdminController.getVerifications] Error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Gagal mengambil data verifikasi penjual.",
+      });
+    }
+  }
+
+  /**
+   * Mengatur keputusan verifikasi toko penjual: ACC (approve), Tolak (reject) dengan alasan, atau Pending
+   * PATCH /api/admin/verifications/:id/decision
+   */
+  async updateVerificationDecision(req: Request, res: Response): Promise<void> {
+    try {
+      const sellerId = Number(req.params.id);
+      if (!sellerId || isNaN(sellerId)) {
+        res.status(400).json({
+          success: false,
+          message: "ID penjual tidak valid.",
+        });
+        return;
+      }
+
+      const { decision, reason } = req.body;
+      if (!decision || !["approve", "reject", "pending"].includes(decision)) {
+        res.status(400).json({
+          success: false,
+          message: "Keputusan tidak valid. Pilihan yang diperbolehkan: 'approve', 'reject', atau 'pending'.",
+        });
+        return;
+      }
+
+      // Pastikan akun penjual ada
+      const checkStmt = db.prepare("SELECT id, name, verification_status FROM users WHERE id = ? AND role = 'penjual'");
+      const current = checkStmt.get(sellerId) as unknown as { id: number; name: string; verification_status: string } | undefined;
+
+      if (!current) {
+        res.status(404).json({
+          success: false,
+          message: "Akun penjual tidak ditemukan.",
+        });
+        return;
+      }
+
+      let newStatus = "unverified";
+      let newReason: string | null = null;
+      let message = "";
+
+      if (decision === "approve") {
+        newStatus = "verified";
+        newReason = null;
+        message = `Toko '${current.name}' berhasil disetujui (ACC). Lencana 'Official Verified Merchant' telah aktif.`;
+      } else if (decision === "reject") {
+        const trimmedReason = typeof reason === "string" ? reason.trim() : "";
+        if (!trimmedReason) {
+          res.status(400).json({
+            success: false,
+            message: "Alasan penolakan wajib diisi untuk memberikan instruksi perbaikan kepada penjual.",
+          });
+          return;
+        }
+        newStatus = "rejected";
+        newReason = trimmedReason;
+        message = `Pengajuan verifikasi toko '${current.name}' telah ditolak dengan alasan: "${trimmedReason}".`;
+      } else if (decision === "pending") {
+        newStatus = "pending";
+        newReason = typeof reason === "string" && reason.trim() ? reason.trim() : null;
+        message = `Status verifikasi toko '${current.name}' berhasil diatur ke 'Menunggu Tinjauan' (Pending).`;
+      }
+
+      const updateStmt = db.prepare(`
+        UPDATE users
+        SET verification_status = ?,
+            verification_rejection_reason = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND role = 'penjual'
+      `);
+
+      updateStmt.run(newStatus, newReason, sellerId);
+
+      // Ambil data penjual yang telah diperbarui
+      const selectStmt = db.prepare(`
+        SELECT 
+          id, name, username, email, role, status, suspension_reason,
+          is_store_open, store_balance, verification_status,
+          verification_submitted_at, verification_data,
+          verification_rejection_reason, created_at, updated_at
+        FROM users
+        WHERE id = ?
+      `);
+      const row = selectStmt.get(sellerId) as unknown as any;
+
+      let parsedData: any = null;
+      if (row.verification_data) {
+        try {
+          parsedData = JSON.parse(row.verification_data);
+        } catch {
+          parsedData = null;
+        }
+      }
+
+      const updatedSeller = {
+        id: row.id,
+        name: row.name,
+        username: row.username,
+        email: row.email,
+        role: row.role,
+        status: row.status,
+        suspensionReason: row.suspension_reason,
+        isStoreOpen: row.is_store_open !== 0,
+        storeBalance: Number(row.store_balance || 0),
+        verificationStatus: row.verification_status,
+        verificationSubmittedAt: row.verification_submitted_at,
+        verificationData: parsedData,
+        verificationRejectionReason: row.verification_rejection_reason,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      };
+
+      // Hitung ulang statistik realtime
+      const statsStmt = db.prepare(`
+        SELECT 
+          COUNT(*) as totalPenjual,
+          SUM(CASE WHEN verification_status = 'pending' THEN 1 ELSE 0 END) as pendingCount,
+          SUM(CASE WHEN verification_status = 'verified' THEN 1 ELSE 0 END) as verifiedCount,
+          SUM(CASE WHEN verification_status = 'rejected' THEN 1 ELSE 0 END) as rejectedCount,
+          SUM(CASE WHEN verification_status = 'unverified' OR verification_status IS NULL THEN 1 ELSE 0 END) as unverifiedCount
+        FROM users
+        WHERE role = 'penjual'
+      `);
+      const latestStats = statsStmt.get() as unknown as any;
+
+      res.json({
+        success: true,
+        message,
+        seller: updatedSeller,
+        stats: {
+          totalPenjual: latestStats.totalPenjual || 0,
+          pendingCount: latestStats.pendingCount || 0,
+          verifiedCount: latestStats.verifiedCount || 0,
+          rejectedCount: latestStats.rejectedCount || 0,
+          unverifiedCount: latestStats.unverifiedCount || 0,
+        },
+      });
+    } catch (error) {
+      console.error("[AdminController.updateVerificationDecision] Error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Gagal memperbarui status verifikasi penjual.",
+      });
+    }
+  }
 }
 
 export const adminController = new AdminController();

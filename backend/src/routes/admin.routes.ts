@@ -18,6 +18,10 @@ router.put("/users/:id", adminController.updateUser.bind(adminController));
 router.post("/users/:id/reset-password", adminController.resetUserPassword.bind(adminController));
 router.delete("/users/:id", adminController.deleteUser.bind(adminController));
 
+// Verifikasi & Kelayakan Merchant (Penjual)
+router.get("/verifications", adminController.getVerifications.bind(adminController));
+router.patch("/verifications/:id/decision", adminController.updateVerificationDecision.bind(adminController));
+
 // Kontrol On/Off Server
 router.get("/server-status", adminController.getServerStatus.bind(adminController));
 router.patch("/server-status", adminController.updateServerStatus.bind(adminController));
