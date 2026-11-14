@@ -369,6 +369,25 @@ export const CheckIcon: React.FC<IconProps> = ({ size = 18, className = "", ...p
   </svg>
 );
 
+export const CheckCircleIcon: React.FC<IconProps> = ({ size = 18, className = "", ...props }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.75"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    className={className}
+    {...props}
+  >
+    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+    <polyline points="22 4 12 14.01 9 11.01" />
+  </svg>
+);
+
 export const SunIcon: React.FC<IconProps> = ({ size = 18, className = "", ...props }) => (
   <svg
     width={size}
@@ -668,5 +687,46 @@ export const EditIcon: React.FC<IconProps> = ({ size = 18, className = "", ...pr
   >
     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+  </svg>
+);
+
+export const DownloadIcon: React.FC<IconProps> = ({ size = 18, className = "", ...props }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.75"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    className={className}
+    {...props}
+  >
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="7 10 12 15 17 10" />
+    <line x1="12" y1="15" x2="12" y2="3" />
+  </svg>
+);
+
+export const KeyIcon: React.FC<IconProps> = ({ size = 18, className = "", ...props }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.75"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    className={className}
+    {...props}
+  >
+    <path d="m15.5 8.5 2 2" />
+    <path d="m18 6 3 3-4.5 4.5" />
+    <circle cx="7.5" cy="15.5" r="5.5" />
+    <path d="m11.5 11.5 8-8" />
   </svg>
 );

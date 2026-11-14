@@ -352,12 +352,6 @@ export const Navbar: React.FC<NavbarProps> = ({ cartItemCount = 0 }) => {
                   <span className="select-none tracking-tight">
                     {user?.name ? user.name[0]?.toUpperCase() : <UserIcon size={18} />}
                   </span>
-
-                  {/* Micro-indicator: Status Online Emerald */}
-                  <span
-                    className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-900"
-                    aria-hidden="true"
-                  />
                 </button>
 
                 {/* Dropdown Menu Profile & Settings */}

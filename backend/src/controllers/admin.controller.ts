@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import bcrypt from "bcryptjs";
 import { db, isServerActive, setServerActive } from "../config/database";
 import { UserRole, UserStatus } from "../types/auth.types";
 
@@ -113,6 +114,102 @@ export class AdminController {
       res.status(500).json({
         success: false,
         message: "Gagal mengambil data pengguna dari basis data.",
+      });
+    }
+  }
+
+  /**
+   * Menambahkan pengguna baru (Pembeli, Penjual, atau Admin)
+   * POST /api/admin/users
+   */
+  async createUser(req: Request, res: Response): Promise<void> {
+    try {
+      const { name, username, email, password, role, status } = req.body;
+
+      if (!name || !username || !email || !password) {
+        res.status(400).json({
+          success: false,
+          message: "Field nama, username, email, dan password wajib diisi.",
+        });
+        return;
+      }
+
+      const trimmedName = String(name).trim();
+      const trimmedUsername = String(username).trim().toLowerCase();
+      const trimmedEmail = String(email).trim().toLowerCase();
+      const rawPassword = String(password);
+      const userRole: UserRole = ["admin", "penjual", "user"].includes(role) ? role : "user";
+      const userStatus: UserStatus = ["active", "suspended"].includes(status) ? status : "active";
+
+      if (trimmedName.length < 2) {
+        res.status(400).json({
+          success: false,
+          message: "Nama lengkap minimal 2 karakter.",
+        });
+        return;
+      }
+
+      const usernameRegex = /^[a-zA-Z0-9_]{3,30}$/;
+      if (!usernameRegex.test(trimmedUsername)) {
+        res.status(400).json({
+          success: false,
+          message: "Username harus 3-30 karakter alfanumerik atau underscore (_).",
+        });
+        return;
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(trimmedEmail)) {
+        res.status(400).json({
+          success: false,
+          message: "Format email tidak valid.",
+        });
+        return;
+      }
+
+      if (rawPassword.length < 6) {
+        res.status(400).json({
+          success: false,
+          message: "Password minimal 6 karakter.",
+        });
+        return;
+      }
+
+      // Periksa apakah username atau email sudah ada
+      const checkStmt = db.prepare("SELECT id, username, email FROM users WHERE LOWER(username) = ? OR LOWER(email) = ?");
+      const existingUser = checkStmt.get(trimmedUsername, trimmedEmail) as { id: number; username: string; email: string } | undefined;
+
+      if (existingUser) {
+        const field = existingUser.username.toLowerCase() === trimmedUsername ? "Username" : "Email";
+        res.status(400).json({
+          success: false,
+          message: `${field} '${field === "Username" ? trimmedUsername : trimmedEmail}' sudah terdaftar.`,
+        });
+        return;
+      }
+
+      const hashedPassword = await bcrypt.hash(rawPassword, 10);
+      const insertStmt = db.prepare(`
+        INSERT INTO users (name, username, email, password, role, status)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `);
+
+      const result = insertStmt.run(trimmedName, trimmedUsername, trimmedEmail, hashedPassword, userRole, userStatus);
+      const newId = Number(result.lastInsertRowid);
+
+      const findStmt = db.prepare("SELECT id, name, username, email, role, status, suspension_reason, created_at, updated_at FROM users WHERE id = ?");
+      const newUser = findStmt.get(newId) as unknown as AdminUserListItem;
+
+      res.status(201).json({
+        success: true,
+        message: `Pengguna '${trimmedName}' (@${trimmedUsername}) berhasil ditambahkan sebagai ${userRole}.`,
+        user: newUser,
+      });
+    } catch (error) {
+      console.error("[AdminController.createUser] Error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Terjadi kesalahan saat menambahkan pengguna.",
       });
     }
   }
@@ -390,6 +487,278 @@ export class AdminController {
       res.status(500).json({
         success: false,
         message: "Gagal menghapus pengguna.",
+      });
+    }
+  }
+
+  /**
+   * Mengedit data lengkap pengguna (Profil, Role, Status, Password Baru)
+   * PUT /api/admin/users/:id
+   */
+  async updateUser(req: Request, res: Response): Promise<void> {
+    try {
+      const targetId = parseInt(req.params.id as string, 10);
+      const { name, username, email, role, status, newPassword, reason } = req.body;
+
+      if (isNaN(targetId) || targetId <= 0) {
+        res.status(400).json({
+          success: false,
+          message: "ID pengguna tidak valid.",
+        });
+        return;
+      }
+
+      const findStmt = db.prepare(
+        "SELECT id, name, username, email, role, status, suspension_reason FROM users WHERE id = ?"
+      );
+      const currentUser = findStmt.get(targetId) as unknown as AdminUserListItem | undefined;
+
+      if (!currentUser) {
+        res.status(404).json({
+          success: false,
+          message: "Pengguna tidak ditemukan.",
+        });
+        return;
+      }
+
+      const isRootAdmin = targetId === 1;
+      const isCurrentAuthUser = req.user && req.user.id === targetId;
+
+      const trimmedName = name ? String(name).trim() : currentUser.name;
+      const trimmedUsername = username ? String(username).trim().toLowerCase() : currentUser.username;
+      const trimmedEmail = email ? String(email).trim().toLowerCase() : currentUser.email;
+
+      if (trimmedName.length < 2) {
+        res.status(400).json({
+          success: false,
+          message: "Nama lengkap minimal 2 karakter.",
+        });
+        return;
+      }
+
+      const usernameRegex = /^[a-zA-Z0-9_]{3,30}$/;
+      if (!usernameRegex.test(trimmedUsername)) {
+        res.status(400).json({
+          success: false,
+          message: "Username harus 3-30 karakter alfanumerik atau underscore (_).",
+        });
+        return;
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(trimmedEmail)) {
+        res.status(400).json({
+          success: false,
+          message: "Format email tidak valid.",
+        });
+        return;
+      }
+
+      // Proteksi Superadmin #1 dan akun sendiri
+      let targetRole = currentUser.role;
+      if (role && ["admin", "penjual", "user"].includes(role)) {
+        if (isRootAdmin && role !== "admin") {
+          res.status(403).json({
+            success: false,
+            message: "Role Superadmin utama (#1) tidak boleh diubah.",
+          });
+          return;
+        }
+        targetRole = role;
+      }
+
+      let targetStatus: UserStatus = currentUser.status;
+      let suspensionReason: string | null = currentUser.suspension_reason ?? null;
+      if (status && ["active", "suspended"].includes(status)) {
+        if (isRootAdmin && status === "suspended") {
+          res.status(403).json({
+            success: false,
+            message: "Akun Superadmin utama (#1) tidak boleh dinonaktifkan.",
+          });
+          return;
+        }
+        if (isCurrentAuthUser && status === "suspended") {
+          res.status(400).json({
+            success: false,
+            message: "Anda tidak dapat menonaktifkan akun Anda sendiri.",
+          });
+          return;
+        }
+        targetStatus = status;
+        suspensionReason =
+          status === "suspended"
+            ? (reason || currentUser.suspension_reason || "Akun dibekukan oleh administrator.")
+            : null;
+      }
+
+      // Validasi duplikasi username & email terhadap user lain
+      const duplicateStmt = db.prepare(
+        "SELECT id, username, email FROM users WHERE (LOWER(username) = ? OR LOWER(email) = ?) AND id != ?"
+      );
+      const duplicate = duplicateStmt.get(trimmedUsername, trimmedEmail, targetId) as
+        | { id: number; username: string; email: string }
+        | undefined;
+      if (duplicate) {
+        const field = duplicate.username.toLowerCase() === trimmedUsername ? "Username" : "Email";
+        res.status(400).json({
+          success: false,
+          message: `${field} '${field === "Username" ? trimmedUsername : trimmedEmail}' sudah digunakan akun lain.`,
+        });
+        return;
+      }
+
+      // Update password jika diisi
+      if (newPassword && String(newPassword).trim().length > 0) {
+        const rawPwd = String(newPassword).trim();
+        if (rawPwd.length < 6) {
+          res.status(400).json({
+            success: false,
+            message: "Password baru minimal 6 karakter.",
+          });
+          return;
+        }
+        const hashedPassword = await bcrypt.hash(rawPwd, 10);
+        db.prepare("UPDATE users SET password = ? WHERE id = ?").run(hashedPassword, targetId);
+      }
+
+      // Update data pengguna di database
+      const updateStmt = db.prepare(`
+        UPDATE users
+        SET name = ?, username = ?, email = ?, role = ?, status = ?, suspension_reason = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `);
+      updateStmt.run(
+        trimmedName,
+        trimmedUsername,
+        trimmedEmail,
+        targetRole,
+        targetStatus,
+        suspensionReason,
+        targetId
+      );
+
+      const updatedUserStmt = db.prepare(
+        "SELECT id, name, username, email, role, status, suspension_reason, created_at, updated_at FROM users WHERE id = ?"
+      );
+      const updatedUser = updatedUserStmt.get(targetId) as unknown as AdminUserListItem;
+
+      res.json({
+        success: true,
+        message: `Data akun '${trimmedName}' (@${trimmedUsername}) berhasil diperbarui.`,
+        user: updatedUser,
+      });
+    } catch (error) {
+      console.error("[AdminController.updateUser] Error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Terjadi kesalahan saat memperbarui data pengguna.",
+      });
+    }
+  }
+
+  /**
+   * Menghapus banyak akun pengguna sekaligus secara massal
+   * POST /api/admin/users/bulk-delete
+   */
+  async bulkDeleteUsers(req: Request, res: Response): Promise<void> {
+    try {
+      const { userIds } = req.body;
+      if (!Array.isArray(userIds) || userIds.length === 0) {
+        res.status(400).json({
+          success: false,
+          message: "Daftar ID pengguna (userIds) wajib disertakan sebagai array.",
+        });
+        return;
+      }
+
+      const currentAdminId = req.user?.id;
+      const validTargetIds = userIds
+        .map((id) => Number(id))
+        .filter((id) => !isNaN(id) && id > 1 && id !== currentAdminId);
+
+      if (validTargetIds.length === 0) {
+        res.status(400).json({
+          success: false,
+          message:
+            "Tidak ada akun valid yang dapat dihapus (Superadmin #1 dan akun aktif Anda terlindungi).",
+        });
+        return;
+      }
+
+      const placeholders = validTargetIds.map(() => "?").join(",");
+      const deleteStmt = db.prepare(`DELETE FROM users WHERE id IN (${placeholders})`);
+      deleteStmt.run(...validTargetIds);
+
+      res.json({
+        success: true,
+        message: `${validTargetIds.length} akun pengguna berhasil dihapus dari sistem.`,
+        deletedCount: validTargetIds.length,
+      });
+    } catch (error) {
+      console.error("[AdminController.bulkDeleteUsers] Error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Gagal menghapus pengguna secara massal.",
+      });
+    }
+  }
+
+  /**
+   * Reset kata sandi pengguna secara langsung oleh admin
+   * POST /api/admin/users/:id/reset-password
+   */
+  async resetUserPassword(req: Request, res: Response): Promise<void> {
+    try {
+      const targetId = parseInt(req.params.id as string, 10);
+      const { customPassword } = req.body;
+
+      if (isNaN(targetId) || targetId <= 0) {
+        res.status(400).json({
+          success: false,
+          message: "ID pengguna tidak valid.",
+        });
+        return;
+      }
+
+      const findStmt = db.prepare("SELECT id, name, username FROM users WHERE id = ?");
+      const user = findStmt.get(targetId) as { id: number; name: string; username: string } | undefined;
+
+      if (!user) {
+        res.status(404).json({
+          success: false,
+          message: "Pengguna tidak ditemukan.",
+        });
+        return;
+      }
+
+      let newPass = customPassword ? String(customPassword).trim() : "";
+      if (!newPass) {
+        newPass = "NextShop" + Math.floor(1000 + Math.random() * 9000);
+      } else if (newPass.length < 6) {
+        res.status(400).json({
+          success: false,
+          message: "Password baru minimal 6 karakter.",
+        });
+        return;
+      }
+
+      const hashedPassword = await bcrypt.hash(newPass, 10);
+      db.prepare("UPDATE users SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(
+        hashedPassword,
+        targetId
+      );
+
+      res.json({
+        success: true,
+        message: `Kata sandi untuk '${user.name}' (@${user.username}) berhasil direset.`,
+        newPassword: newPass,
+        temporaryPassword: newPass,
+      });
+    } catch (error) {
+      console.error("[AdminController.resetUserPassword] Error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Gagal mereset kata sandi pengguna.",
       });
     }
   }

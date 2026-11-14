@@ -13,12 +13,19 @@ import {
   UserIcon,
   ShoppingBagIcon,
   ShieldIcon,
+  LockIcon,
   SearchIcon,
   RefreshIcon,
   TrashIcon,
   CheckIcon,
+  CheckCircleIcon,
   CloseIcon,
   EditIcon,
+  PlusIcon,
+  DownloadIcon,
+  KeyIcon,
+  EyeIcon,
+  EyeOffIcon,
 } from "@/components/ui/icons";
 
 interface SuspensionReason {
@@ -56,7 +63,7 @@ const SUSPENSION_REASONS: SuspensionReason[] = [
 ];
 
 /**
- * Komponen Ikon SVG Khusus untuk Setiap Alasan Pembekuan Akun (Tanpa Emoji Keyboard)
+ * Komponen Ikon SVG Khusus untuk Setiap Alasan Pembekuan Akun
  */
 const ReasonIconBadge: React.FC<{ reasonId: string; className?: string }> = ({
   reasonId,
@@ -170,7 +177,6 @@ export const UserManagementView: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [lastSyncTime, setLastSyncTime] = useState<Date>(new Date());
-  const [isAutoSyncEnabled, setIsAutoSyncEnabled] = useState<boolean>(true);
 
   // Filter & Search State
   const [searchTerm, setSearchTerm] = useState<string>("");
@@ -183,31 +189,67 @@ export const UserManagementView: React.FC = () => {
   const [isBulkModalOpen, setIsBulkModalOpen] = useState<boolean>(false);
   const [bulkTargetStatus, setBulkTargetStatus] = useState<UserStatus>("suspended");
   const [isUpdatingBulk, setIsUpdatingBulk] = useState<boolean>(false);
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState<boolean>(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState<boolean>(false);
 
-  // Systematic Reason & Note State
+  // Systematic Reason & Note State (Untuk Pembekuan Akun)
   const [selectedReasonId, setSelectedReasonId] = useState<string>("suspicious_activity");
   const [customNote, setCustomNote] = useState<string>("");
 
-  // Modal & Aksi Role
-  const [selectedUserForRole, setSelectedUserForRole] = useState<AdminUserItem | null>(null);
-  const [newRoleValue, setNewRoleValue] = useState<UserRole>("user");
-  const [isUpdatingRole, setIsUpdatingRole] = useState<boolean>(false);
+  // Modal 1: Tambah Pengguna Baru
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
+  const [createFormData, setCreateFormData] = useState({
+    name: "",
+    username: "",
+    email: "",
+    password: "",
+    role: "user" as UserRole,
+    status: "active" as UserStatus,
+  });
+  const [showCreatePassword, setShowCreatePassword] = useState<boolean>(false);
+  const [isCreatingUser, setIsCreatingUser] = useState<boolean>(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
-  // Modal & Aksi Status Akun Tunggal (Protokol Pembekuan / Reaktivasi)
+  // Modal 2: Edit Pengguna Lengkap
+  const [selectedUserForEdit, setSelectedUserForEdit] = useState<AdminUserItem | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    name: "",
+    username: "",
+    email: "",
+    role: "user" as UserRole,
+    status: "active" as UserStatus,
+    newPassword: "",
+    reason: "",
+  });
+  const [showEditPassword, setShowEditPassword] = useState<boolean>(false);
+  const [isUpdatingUser, setIsUpdatingUser] = useState<boolean>(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  // Modal 3: Reset Kata Sandi Langsung
+  const [selectedUserForResetPassword, setSelectedUserForResetPassword] = useState<AdminUserItem | null>(null);
+  const [resetCustomPassword, setResetCustomPassword] = useState<string>("");
+  const [resetPasswordResult, setResetPasswordResult] = useState<string | null>(null);
+  const [isResettingPassword, setIsResettingPassword] = useState<boolean>(false);
+  const [isPasswordCopied, setIsPasswordCopied] = useState<boolean>(false);
+
+  // Modal 4: Detail Pengguna Lengkap
+  const [selectedUserForDetail, setSelectedUserForDetail] = useState<AdminUserItem | null>(null);
+
+  // Modal 5: Status Akun Tunggal (Switch Protokol Pembekuan / Reaktivasi)
   const [selectedUserForStatus, setSelectedUserForStatus] = useState<AdminUserItem | null>(null);
   const [targetStatusValue, setTargetStatusValue] = useState<UserStatus>("suspended");
   const [isUpdatingStatus, setIsUpdatingStatus] = useState<boolean>(false);
 
-  // Modal Hapus Pengguna
+  // Modal 6: Hapus Pengguna Tunggal
   const [selectedUserForDelete, setSelectedUserForDelete] = useState<AdminUserItem | null>(null);
   const [isDeletingUser, setIsDeletingUser] = useState<boolean>(false);
 
+  // Feedback Toast
   const [feedbackToast, setFeedbackToast] = useState<{
     type: "success" | "error";
     message: string;
   } | null>(null);
 
-  // Tampilkan toast notifikasi sementara
   const showToast = useCallback((message: string, type: "success" | "error" = "success") => {
     setFeedbackToast({ type, message });
     setTimeout(() => {
@@ -251,23 +293,22 @@ export const UserManagementView: React.FC = () => {
     [token, searchTerm, selectedRole, selectedStatus, sortBy, showToast]
   );
 
-  // Inisialisasi fetch awal dan saat filter berubah
   useEffect(() => {
     fetchUsers(false);
   }, [fetchUsers]);
 
-  // Real-time background sync polling (setiap 8 detik jika auto sync aktif)
+  // Background auto-refresh berkala
   useEffect(() => {
-    if (!isAutoSyncEnabled || !token) return;
+    if (!token) return;
 
     const interval = setInterval(() => {
       fetchUsers(true);
-    }, 8000);
+    }, 15000);
 
     return () => clearInterval(interval);
-  }, [isAutoSyncEnabled, token, fetchUsers]);
+  }, [token, fetchUsers]);
 
-  // Daftar pengguna yang dapat dipilih secara massal (exclude superadmin #1 & current user)
+  // Daftar pengguna yang dapat dipilih secara massal
   const selectableUsers = useMemo(() => {
     return users.filter((u) => u.id !== 1 && u.id !== currentUser?.id);
   }, [users, currentUser?.id]);
@@ -286,31 +327,163 @@ export const UserManagementView: React.FC = () => {
     );
   };
 
-  // Handler update role pengguna
-  const handleConfirmUpdateRole = async () => {
-    if (!token || !selectedUserForRole) return;
+  // Handler: Tambah Pengguna Baru
+  const handleOpenCreateModal = () => {
+    setCreateFormData({
+      name: "",
+      username: "",
+      email: "",
+      password: "",
+      role: "user",
+      status: "active",
+    });
+    setCreateError(null);
+    setShowCreatePassword(false);
+    setIsCreateModalOpen(true);
+  };
 
-    setIsUpdatingRole(true);
+  const handleGenerateRandomPassword = () => {
+    const generated = "Next@" + Math.floor(100000 + Math.random() * 900000);
+    setCreateFormData((prev) => ({ ...prev, password: generated }));
+    setShowCreatePassword(true);
+  };
+
+  const handleConfirmCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token) return;
+
+    if (!createFormData.name || !createFormData.username || !createFormData.email || !createFormData.password) {
+      setCreateError("Semua field wajib diisi.");
+      return;
+    }
+
+    if (createFormData.password.length < 6) {
+      setCreateError("Kata sandi minimal 6 karakter.");
+      return;
+    }
+
+    setIsCreatingUser(true);
+    setCreateError(null);
+
     try {
-      const res = await adminService.updateUserRole(token, selectedUserForRole.id, newRoleValue);
+      const res = await adminService.createUser(token, createFormData);
       if (res.success) {
-        showToast(
-          res.message ||
-            `Role ${selectedUserForRole.name} berhasil diubah menjadi ${newRoleValue}`
-        );
-        setSelectedUserForRole(null);
+        showToast(res.message || `Pengguna '${createFormData.name}' berhasil ditambahkan.`);
+        setIsCreateModalOpen(false);
         fetchUsers(true);
       } else {
-        showToast(res.message || "Gagal mengubah role pengguna", "error");
+        setCreateError(res.message || "Gagal menambahkan pengguna.");
       }
     } catch {
-      showToast("Terjadi kesalahan koneksi", "error");
+      setCreateError("Terjadi kesalahan koneksi server.");
     } finally {
-      setIsUpdatingRole(false);
+      setIsCreatingUser(false);
     }
   };
 
-  // Handler update status akun tunggal (sistematis dengan alasan & catatan)
+  // Handler: Buka Modal Edit Pengguna
+  const handleOpenEditModal = (u: AdminUserItem) => {
+    setSelectedUserForEdit(u);
+    setEditFormData({
+      name: u.name,
+      username: u.username,
+      email: u.email,
+      role: u.role,
+      status: u.status,
+      newPassword: "",
+      reason: u.suspension_reason || "",
+    });
+    setEditError(null);
+    setShowEditPassword(false);
+  };
+
+  const handleConfirmUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !selectedUserForEdit) return;
+
+    setIsUpdatingUser(true);
+    setEditError(null);
+
+    try {
+      const payload: {
+        name: string;
+        username: string;
+        email: string;
+        role?: UserRole;
+        status?: UserStatus;
+        newPassword?: string;
+        reason?: string;
+      } = {
+        name: editFormData.name,
+        username: editFormData.username,
+        email: editFormData.email,
+        role: editFormData.role,
+        status: editFormData.status,
+      };
+
+      if (editFormData.newPassword && editFormData.newPassword.trim().length > 0) {
+        payload.newPassword = editFormData.newPassword.trim();
+      }
+
+      if (editFormData.status === "suspended") {
+        payload.reason = editFormData.reason || "Akun dibekukan oleh admin.";
+      }
+
+      const res = await adminService.updateUser(token, selectedUserForEdit.id, payload);
+      if (res.success) {
+        showToast(res.message || `Data '${editFormData.name}' berhasil diperbarui.`);
+        setSelectedUserForEdit(null);
+        fetchUsers(true);
+      } else {
+        setEditError(res.message || "Gagal memperbarui data pengguna.");
+      }
+    } catch {
+      setEditError("Terjadi kesalahan koneksi server.");
+    } finally {
+      setIsUpdatingUser(false);
+    }
+  };
+
+  // Handler: Buka Modal Reset Password
+  const handleOpenResetPasswordModal = (u: AdminUserItem) => {
+    setSelectedUserForResetPassword(u);
+    setResetCustomPassword("");
+    setResetPasswordResult(null);
+    setIsPasswordCopied(false);
+  };
+
+  const handleConfirmResetPassword = async () => {
+    if (!token || !selectedUserForResetPassword) return;
+
+    setIsResettingPassword(true);
+    try {
+      const res = await adminService.resetUserPassword(
+        token,
+        selectedUserForResetPassword.id,
+        resetCustomPassword ? resetCustomPassword.trim() : undefined
+      );
+
+      if (res.success && res.newPassword) {
+        setResetPasswordResult(res.newPassword);
+        showToast(res.message || "Kata sandi berhasil direset.");
+      } else {
+        showToast(res.message || "Gagal mereset kata sandi.", "error");
+      }
+    } catch {
+      showToast("Terjadi kesalahan koneksi.", "error");
+    } finally {
+      setIsResettingPassword(false);
+    }
+  };
+
+  const handleCopyNewPassword = () => {
+    if (!resetPasswordResult) return;
+    navigator.clipboard.writeText(resetPasswordResult);
+    setIsPasswordCopied(true);
+    setTimeout(() => setIsPasswordCopied(false), 2500);
+  };
+
+  // Handler: Update Status Akun Tunggal (Protokol Switch)
   const handleConfirmUpdateStatus = async () => {
     if (!token || !selectedUserForStatus) return;
 
@@ -332,10 +505,7 @@ export const UserManagementView: React.FC = () => {
       );
 
       if (res.success) {
-        showToast(
-          res.message ||
-            `Status akun ${selectedUserForStatus.name} berhasil diperbarui.`
-        );
+        showToast(res.message || `Status akun ${selectedUserForStatus.name} berhasil diperbarui.`);
         setSelectedUserForStatus(null);
         setSelectedReasonId("suspicious_activity");
         setCustomNote("");
@@ -350,7 +520,7 @@ export const UserManagementView: React.FC = () => {
     }
   };
 
-  // Handler update status massal (bulk status)
+  // Handler: Update Status Massal (Bulk Status)
   const handleConfirmBulkStatus = async () => {
     if (!token || selectedUserIds.length === 0) return;
 
@@ -372,10 +542,7 @@ export const UserManagementView: React.FC = () => {
       );
 
       if (res.success) {
-        showToast(
-          res.message ||
-            `${selectedUserIds.length} akun pengguna berhasil diperbarui.`
-        );
+        showToast(res.message || `${selectedUserIds.length} akun pengguna berhasil diperbarui.`);
         setIsBulkModalOpen(false);
         setSelectedUserIds([]);
         setSelectedReasonId("suspicious_activity");
@@ -391,7 +558,7 @@ export const UserManagementView: React.FC = () => {
     }
   };
 
-  // Handler delete pengguna
+  // Handler: Hapus Pengguna Tunggal
   const handleConfirmDeleteUser = async () => {
     if (!token || !selectedUserForDelete) return;
 
@@ -399,9 +566,7 @@ export const UserManagementView: React.FC = () => {
     try {
       const res = await adminService.deleteUser(token, selectedUserForDelete.id);
       if (res.success) {
-        showToast(
-          res.message || `Pengguna '${selectedUserForDelete.name}' berhasil dihapus`
-        );
+        showToast(res.message || `Pengguna '${selectedUserForDelete.name}' berhasil dihapus`);
         setSelectedUserForDelete(null);
         fetchUsers(true);
       } else {
@@ -414,7 +579,74 @@ export const UserManagementView: React.FC = () => {
     }
   };
 
-  // Format tanggal ke Bahasa Indonesia yang elegan
+  // Handler: Hapus Massal (Bulk Delete)
+  const handleConfirmBulkDelete = async () => {
+    if (!token || selectedUserIds.length === 0) return;
+
+    setIsBulkDeleting(true);
+    try {
+      const res = await adminService.bulkDeleteUsers(token, selectedUserIds);
+      if (res.success) {
+        showToast(res.message || `${selectedUserIds.length} akun berhasil dihapus.`);
+        setIsBulkDeleteModalOpen(false);
+        setSelectedUserIds([]);
+        fetchUsers(true);
+      } else {
+        showToast(res.message || "Gagal menghapus pengguna secara massal", "error");
+      }
+    } catch {
+      showToast("Terjadi kesalahan koneksi", "error");
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
+  // Handler: Ekspor CSV Data Pengguna
+  const handleExportCSV = () => {
+    if (users.length === 0) {
+      showToast("Tidak ada data pengguna untuk diekspor", "error");
+      return;
+    }
+
+    const headers = [
+      "ID",
+      "Nama Lengkap",
+      "Username",
+      "Email",
+      "Role",
+      "Status",
+      "Alasan Pembekuan",
+      "Tanggal Terdaftar",
+    ];
+
+    const rows = users.map((u) => [
+      u.id,
+      `"${u.name.replace(/"/g, '""')}"`,
+      `"${u.username}"`,
+      `"${u.email}"`,
+      u.role,
+      u.status,
+      `"${(u.suspension_reason || "").replace(/"/g, '""')}"`,
+      `"${formatDate(u.created_at)}"`,
+    ]);
+
+    const csvContent =
+      "\uFEFF" + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const dateStr = new Date().toISOString().split("T")[0];
+    link.setAttribute("href", url);
+    link.setAttribute("download", `nextshopid_pengguna_${dateStr}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    showToast(`Data ${users.length} pengguna berhasil diekspor ke format CSV.`);
+  };
+
+  // Format tanggal ke Bahasa Indonesia
   const formatDate = (isoString: string) => {
     try {
       const d = new Date(isoString);
@@ -430,7 +662,6 @@ export const UserManagementView: React.FC = () => {
     }
   };
 
-  // Helper avatar gradient
   const getAvatarGradient = (name: string, role: string) => {
     if (role === "admin") return "from-purple-600 via-indigo-600 to-blue-600";
     if (role === "penjual") return "from-emerald-500 via-teal-600 to-cyan-700";
@@ -470,54 +701,50 @@ export const UserManagementView: React.FC = () => {
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
               Manajemen Pengguna
             </h1>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-              </span>
-              Realtime Sync
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-white/10">
+              {stats.total} Akun
             </span>
           </div>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Kelola data akun pembeli, toko penjual, dan kontrol pembekuan akses pengguna secara sistematis.
+            Daftarkan, sunting profil, atur hak akses, dan pantau status seluruh pengguna platform NextShopID.
           </p>
         </div>
 
-        {/* Action Controls: Refresh & Auto Sync Toggle */}
-        <div className="flex items-center gap-2.5 self-start sm:self-auto">
-          <span className="hidden xl:inline-block text-[11px] text-slate-400">
-            Sinkron: {lastSyncTime.toLocaleTimeString("id-ID")}
-          </span>
-
+        {/* Action Controls: Tambah Pengguna, Ekspor CSV, & Segarkan Data */}
+        <div className="flex flex-wrap items-center gap-2.5 self-start sm:self-auto">
+          {/* Tombol Tambah Pengguna Baru (Primary CTA) */}
           <button
             type="button"
-            onClick={() => setIsAutoSyncEnabled((prev) => !prev)}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors cursor-pointer ${
-              isAutoSyncEnabled
-                ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800"
-                : "bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-white/10"
-            }`}
-            title={isAutoSyncEnabled ? "Klik untuk pause auto-sync" : "Klik untuk aktifkan auto-sync"}
+            onClick={handleOpenCreateModal}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 active:scale-95 text-white shadow-md shadow-blue-600/25 transition-all cursor-pointer"
           >
-            <span
-              className={`h-2 w-2 rounded-full ${
-                isAutoSyncEnabled ? "bg-emerald-500" : "bg-slate-400"
-              }`}
-            />
-            <span>{isAutoSyncEnabled ? "Auto Live: ON" : "Auto Live: PAUSED"}</span>
+            <PlusIcon size={15} />
+            <span>Tambah Pengguna</span>
           </button>
 
+          {/* Tombol Ekspor CSV */}
+          <button
+            type="button"
+            onClick={handleExportCSV}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-[#111827] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors cursor-pointer"
+            title="Unduh data pengguna dalam format spreadsheet CSV"
+          >
+            <DownloadIcon size={14} className="text-slate-500 dark:text-slate-400" />
+            <span className="hidden sm:inline">Ekspor CSV</span>
+          </button>
+
+          {/* Tombol Segarkan Manual */}
           <button
             type="button"
             onClick={() => fetchUsers(false)}
             disabled={isRefreshing}
-            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-white dark:bg-[#111827] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5 shadow-2xs transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-[#111827] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5 shadow-2xs transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
           >
             <RefreshIcon
               size={14}
               className={`text-blue-500 ${isRefreshing ? "animate-spin" : ""}`}
             />
-            <span>{isRefreshing ? "Menyinkronkan..." : "Segarkan"}</span>
+            <span className="hidden sm:inline">{isRefreshing ? "Menyinkronkan..." : "Segarkan"}</span>
           </button>
         </div>
       </div>
@@ -537,15 +764,13 @@ export const UserManagementView: React.FC = () => {
           <p className="mt-2 text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
             {stats.total}
           </p>
-          <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-400">
-            <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              <span>{stats.totalActive ?? 0} Aktif</span>
+          <div className="mt-1 flex items-center gap-2 text-[11px]">
+            <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+              {stats.totalActive ?? 0} Aktif
             </span>
-            <span>•</span>
-            <span className="inline-flex items-center gap-1 text-rose-500 dark:text-rose-400 font-medium">
-              <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
-              <span>{stats.totalSuspended ?? 0} Dibekukan</span>
+            <span className="text-slate-300 dark:text-slate-600">•</span>
+            <span className="text-rose-500 dark:text-rose-400 font-semibold">
+              {stats.totalSuspended ?? 0} Dibekukan
             </span>
           </div>
         </div>
@@ -620,38 +845,35 @@ export const UserManagementView: React.FC = () => {
             <button
               type="button"
               onClick={() => setSelectedRole("user")}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                 selectedRole === "user"
                   ? "bg-sky-600 text-white shadow-xs"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200/70 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
               }`}
             >
-              <span className="h-1.5 w-1.5 rounded-full bg-sky-400" />
-              <span>Pembeli ({stats.totalPembeli})</span>
+              Pembeli ({stats.totalPembeli})
             </button>
             <button
               type="button"
               onClick={() => setSelectedRole("penjual")}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                 selectedRole === "penjual"
                   ? "bg-emerald-600 text-white shadow-xs"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200/70 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
               }`}
             >
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-              <span>Penjual ({stats.totalPenjual})</span>
+              Penjual ({stats.totalPenjual})
             </button>
             <button
               type="button"
               onClick={() => setSelectedRole("admin")}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                 selectedRole === "admin"
                   ? "bg-purple-600 text-white shadow-xs"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200/70 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
               }`}
             >
-              <span className="h-1.5 w-1.5 rounded-full bg-purple-400" />
-              <span>Admin ({stats.totalAdmin})</span>
+              Admin ({stats.totalAdmin})
             </button>
           </div>
 
@@ -689,26 +911,24 @@ export const UserManagementView: React.FC = () => {
             <button
               type="button"
               onClick={() => setSelectedStatus("active")}
-              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                 selectedStatus === "active"
                   ? "bg-emerald-600 text-white shadow-xs"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200/70 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
               }`}
             >
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-              <span>Aktif ({stats.totalActive ?? 0})</span>
+              Aktif ({stats.totalActive ?? 0})
             </button>
             <button
               type="button"
               onClick={() => setSelectedStatus("suspended")}
-              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                 selectedStatus === "suspended"
                   ? "bg-rose-600 text-white shadow-xs"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200/70 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
               }`}
             >
-              <span className="h-1.5 w-1.5 rounded-full bg-rose-400" />
-              <span>Dibekukan ({stats.totalSuspended ?? 0})</span>
+              Dibekukan ({stats.totalSuspended ?? 0})
             </button>
           </div>
         </div>
@@ -738,7 +958,7 @@ export const UserManagementView: React.FC = () => {
         </div>
       </div>
 
-      {/* Tabel Data Pengguna dengan Switch Interaktif */}
+      {/* Tabel Data Pengguna dengan Kontrol Lengkap */}
       <div className="overflow-hidden rounded-2xl bg-white dark:bg-[#0f172a] border border-slate-200/80 dark:border-white/10 shadow-sm">
         {isLoading ? (
           <div className="p-12 flex flex-col items-center justify-center gap-3">
@@ -754,9 +974,9 @@ export const UserManagementView: React.FC = () => {
               Tidak ada pengguna ditemukan
             </h3>
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
-              Tidak ada data yang cocok dengan kriteria filter saat ini. Coba reset filter Anda.
+              Tidak ada data yang cocok dengan kriteria filter saat ini.
             </p>
-            {(searchTerm || selectedRole !== "all" || selectedStatus !== "all") && (
+            <div className="mt-4 flex items-center justify-center gap-2">
               <button
                 type="button"
                 onClick={() => {
@@ -764,11 +984,18 @@ export const UserManagementView: React.FC = () => {
                   setSelectedRole("all");
                   setSelectedStatus("all");
                 }}
-                className="mt-4 px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white transition-colors cursor-pointer"
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
               >
                 Reset Semua Filter
               </button>
-            )}
+              <button
+                type="button"
+                onClick={handleOpenCreateModal}
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 text-white transition-colors cursor-pointer"
+              >
+                + Tambah Pengguna Baru
+              </button>
+            </div>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -792,7 +1019,7 @@ export const UserManagementView: React.FC = () => {
                     Pengguna
                   </th>
                   <th scope="col" className="px-5 py-3.5">
-                    Role & Identitas
+                    Role & Hak Akses
                   </th>
                   <th scope="col" className="px-5 py-3.5">
                     Status Akun (Kontrol Interaktif)
@@ -835,19 +1062,26 @@ export const UserManagementView: React.FC = () => {
                       {/* Kolom Pengguna (Avatar, Nama, Username, Email) */}
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
-                          <div
+                          <button
+                            type="button"
+                            onClick={() => setSelectedUserForDetail(u)}
                             className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr ${getAvatarGradient(
                               u.name,
                               u.role
-                            )} text-white font-bold text-sm shadow-xs`}
+                            )} text-white font-bold text-sm shadow-xs cursor-pointer hover:opacity-90 transition-opacity`}
+                            title="Klik untuk melihat rincian akun"
                           >
                             {u.name ? u.name[0]?.toUpperCase() : "U"}
-                          </div>
+                          </button>
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="font-semibold text-slate-900 dark:text-white truncate">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedUserForDetail(u)}
+                                className="font-semibold text-slate-900 dark:text-white truncate hover:underline text-left cursor-pointer"
+                              >
                                 {u.name}
-                              </span>
+                              </button>
                               {isCurrentAuthUser && (
                                 <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-500 border border-blue-500/20">
                                   Anda
@@ -883,10 +1117,9 @@ export const UserManagementView: React.FC = () => {
                         )}
                       </td>
 
-                      {/* Kolom Status Akun (Switch Toggle Interaktif yang Sistematis) */}
+                      {/* Kolom Status Akun (Switch Toggle Interaktif) */}
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
-                          {/* Tactile Switch ON / OFF */}
                           <button
                             type="button"
                             role="switch"
@@ -907,12 +1140,12 @@ export const UserManagementView: React.FC = () => {
                             }`}
                             title={
                               isRootAdmin
-                                ? "Akun Superadmin Utama dilindungi dari pembekuan"
+                                ? "Akun Superadmin Utama dilindungi"
                                 : isCurrentAuthUser
                                 ? "Akun Anda sendiri sedang aktif digunakan"
                                 : u.status === "active"
-                                ? "Status AKTIF: Klik untuk memproses protokol pembekuan akun (OFF)"
-                                : `Status DIBEKUKAN${u.suspension_reason ? `: ${u.suspension_reason}` : ""}: Klik untuk membuka kembali akses akun (ON)`
+                                ? "Klik untuk memproses pembekuan akun (OFF)"
+                                : `Status DIBEKUKAN${u.suspension_reason ? `: ${u.suspension_reason}` : ""}: Klik untuk mengaktifkan kembali (ON)`
                             }
                           >
                             <span
@@ -924,22 +1157,9 @@ export const UserManagementView: React.FC = () => {
                               {isRootAdmin || isCurrentAuthUser ? (
                                 <ShieldIcon size={11} className="text-slate-400" />
                               ) : u.status === "active" ? (
-                                <span className="h-2 w-2 rounded-full bg-emerald-600" />
+                                <CheckIcon size={11} className="text-emerald-600 stroke-[3]" />
                               ) : (
-                                <svg
-                                  width="11"
-                                  height="11"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2.5"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  className="text-rose-600"
-                                >
-                                  <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
-                                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                                </svg>
+                                <LockIcon size={11} className="text-rose-600" />
                               )}
                             </span>
                           </button>
@@ -947,18 +1167,15 @@ export const UserManagementView: React.FC = () => {
                           {/* Status Pill Badge */}
                           {u.status === "suspended" ? (
                             <span
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/25"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
                               title={u.suspension_reason ? `Alasan: ${u.suspension_reason}` : "Dibekukan oleh admin"}
                             >
-                              <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+                              <LockIcon size={11} className="shrink-0" />
                               <span>Dibekukan</span>
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
-                              <span className="relative flex h-1.5 w-1.5">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
-                              </span>
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                              <CheckCircleIcon size={12} className="shrink-0" />
                               <span>Aktif</span>
                             </span>
                           )}
@@ -970,26 +1187,42 @@ export const UserManagementView: React.FC = () => {
                         {formatDate(u.created_at)}
                       </td>
 
-                      {/* Kolom Aksi */}
+                      {/* Kolom Aksi Lengkap (Detail, Edit, Reset Password, Hapus) */}
                       <td className="px-5 py-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          {/* Tombol Ubah Role */}
+                          {/* Tombol Detail Akun */}
                           <button
                             type="button"
-                            onClick={() => {
-                              setSelectedUserForRole(u);
-                              setNewRoleValue(u.role);
-                            }}
-                            disabled={isRootAdmin}
-                            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                              isRootAdmin
-                                ? "text-slate-400 opacity-40 cursor-not-allowed"
-                                : "text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 border border-transparent hover:border-blue-200 dark:hover:border-blue-900 cursor-pointer"
-                            }`}
-                            title={isRootAdmin ? "Superadmin utama tidak dapat diubah" : "Ubah role pengguna"}
+                            onClick={() => setSelectedUserForDetail(u)}
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                            title="Lihat rincian lengkap akun"
+                          >
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <circle cx="12" cy="12" r="10" />
+                              <line x1="12" y1="16" x2="12" y2="12" />
+                              <line x1="12" y1="8" x2="12.01" y2="8" />
+                            </svg>
+                          </button>
+
+                          {/* Tombol Edit Pengguna */}
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditModal(u)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 border border-transparent hover:border-blue-200 dark:hover:border-blue-900 transition-colors cursor-pointer"
+                            title="Edit profil, role, atau kata sandi"
                           >
                             <EditIcon size={13} />
-                            <span>Role</span>
+                            <span>Edit</span>
+                          </button>
+
+                          {/* Tombol Reset Password */}
+                          <button
+                            type="button"
+                            onClick={() => handleOpenResetPasswordModal(u)}
+                            className="p-1.5 rounded-lg text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors cursor-pointer"
+                            title="Reset kata sandi akun ini"
+                          >
+                            <KeyIcon size={14} />
                           </button>
 
                           {/* Tombol Hapus */}
@@ -1034,7 +1267,7 @@ export const UserManagementView: React.FC = () => {
         </div>
       </div>
 
-      {/* Floating Bottom Command Dock: Aksi Massal Sistematis */}
+      {/* Floating Bottom Command Dock: Aksi Massal */}
       {selectedUserIds.length > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 animate-in slide-in-from-bottom duration-300">
           <div className="flex items-center gap-3 px-5 py-3 rounded-2xl bg-slate-900/95 dark:bg-[#0b132b]/95 text-white border border-slate-700/60 dark:border-blue-500/30 shadow-2xl backdrop-blur-md">
@@ -1054,18 +1287,6 @@ export const UserManagementView: React.FC = () => {
                 }}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white shadow-xs transition-all cursor-pointer"
               >
-                <svg
-                  width="13"
-                  height="13"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-                </svg>
                 <span>Aktifkan Semua</span>
               </button>
 
@@ -1077,22 +1298,18 @@ export const UserManagementView: React.FC = () => {
                   setCustomNote("");
                   setIsBulkModalOpen(true);
                 }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-600 hover:bg-amber-500 active:scale-95 text-white shadow-xs transition-all cursor-pointer"
+              >
+                <span>Bekukan Semua</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsBulkDeleteModalOpen(true)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-500 active:scale-95 text-white shadow-xs transition-all cursor-pointer"
               >
-                <svg
-                  width="13"
-                  height="13"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                </svg>
-                <span>Bekukan Semua</span>
+                <TrashIcon size={13} />
+                <span>Hapus Terpilih</span>
               </button>
 
               <button
@@ -1108,7 +1325,735 @@ export const UserManagementView: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL 1: Protokol Pembekuan Akun Pengguna (Sistematis, Ikon Grafis Khusus, Tanpa Emoji) */}
+      {/* ========================================================================= */}
+      {/* MODAL 1: Tambah Pengguna Baru (Pembeli, Penjual, atau Admin)             */}
+      {/* ========================================================================= */}
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={() => !isCreatingUser && setIsCreateModalOpen(false)}
+          />
+
+          <div className="relative w-full max-w-lg rounded-3xl bg-white dark:bg-[#0b132b] border border-slate-200 dark:border-blue-500/20 p-6 sm:p-7 shadow-2xl animate-in zoom-in-95 duration-200 z-10 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-200/80 dark:border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                  <PlusIcon size={20} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white leading-tight">
+                    Tambah Pengguna Baru
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Daftarkan akun Pembeli, Penjual, atau Admin ke NextShopID
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCreateModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+              >
+                <CloseIcon size={20} />
+              </button>
+            </div>
+
+            {createError && (
+              <div className="my-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs font-medium">
+                {createError}
+              </div>
+            )}
+
+            <form onSubmit={handleConfirmCreateUser} className="space-y-4 my-4">
+              {/* Field Nama Lengkap */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Nama Lengkap *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={createFormData.name}
+                  onChange={(e) => setCreateFormData({ ...createFormData, name: e.target.value })}
+                  placeholder="Misal: Andi Wijaya"
+                  className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Field Username & Email */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Username *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={createFormData.username}
+                    onChange={(e) =>
+                      setCreateFormData({
+                        ...createFormData,
+                        username: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""),
+                      })
+                    }
+                    placeholder="andiwijaya"
+                    className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Alamat Email *
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={createFormData.email}
+                    onChange={(e) => setCreateFormData({ ...createFormData, email: e.target.value.toLowerCase() })}
+                    placeholder="andi@gmail.com"
+                    className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Field Password Awal */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Kata Sandi Awal *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleGenerateRandomPassword}
+                    className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                  >
+                    Generate Acak
+                  </button>
+                </div>
+                <div className="relative">
+                  <input
+                    type={showCreatePassword ? "text" : "password"}
+                    required
+                    minLength={6}
+                    value={createFormData.password}
+                    onChange={(e) => setCreateFormData({ ...createFormData, password: e.target.value })}
+                    placeholder="Minimal 6 karakter..."
+                    className="w-full pl-3.5 pr-10 py-2.5 rounded-xl text-sm bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCreatePassword((prev) => !prev)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+                  >
+                    {showCreatePassword ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Pilihan Role Pengguna */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                  Pilih Role Pengguna:
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {/* Option: Pembeli */}
+                  <button
+                    type="button"
+                    onClick={() => setCreateFormData({ ...createFormData, role: "user" })}
+                    className={`flex flex-col items-center gap-1.5 p-3 rounded-2xl border transition-all cursor-pointer ${
+                      createFormData.role === "user"
+                        ? "bg-sky-50 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400 border-sky-500 shadow-xs"
+                        : "bg-slate-50 dark:bg-white/5 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-white/10 hover:border-slate-300"
+                    }`}
+                  >
+                    <UserIcon size={18} />
+                    <span className="text-xs font-bold">Pembeli</span>
+                  </button>
+
+                  {/* Option: Penjual */}
+                  <button
+                    type="button"
+                    onClick={() => setCreateFormData({ ...createFormData, role: "penjual" })}
+                    className={`flex flex-col items-center gap-1.5 p-3 rounded-2xl border transition-all cursor-pointer ${
+                      createFormData.role === "penjual"
+                        ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-500 shadow-xs"
+                        : "bg-slate-50 dark:bg-white/5 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-white/10 hover:border-slate-300"
+                    }`}
+                  >
+                    <ShoppingBagIcon size={18} />
+                    <span className="text-xs font-bold">Penjual</span>
+                  </button>
+
+                  {/* Option: Admin */}
+                  <button
+                    type="button"
+                    onClick={() => setCreateFormData({ ...createFormData, role: "admin" })}
+                    className={`flex flex-col items-center gap-1.5 p-3 rounded-2xl border transition-all cursor-pointer ${
+                      createFormData.role === "admin"
+                        ? "bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border-purple-500 shadow-xs"
+                        : "bg-slate-50 dark:bg-white/5 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-white/10 hover:border-slate-300"
+                    }`}
+                  >
+                    <ShieldIcon size={18} />
+                    <span className="text-xs font-bold">Admin</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Status Awal Akun */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                  Status Akun Awal:
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCreateFormData({ ...createFormData, status: "active" })}
+                    className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                      createFormData.status === "active"
+                        ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-500"
+                        : "bg-slate-50 dark:bg-white/5 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-white/10"
+                    }`}
+                  >
+                    <CheckCircleIcon size={14} className="shrink-0" />
+                    <span>Aktif (Normal)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCreateFormData({ ...createFormData, status: "suspended" })}
+                    className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                      createFormData.status === "suspended"
+                        ? "bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border-rose-500"
+                        : "bg-slate-50 dark:bg-white/5 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-white/10"
+                    }`}
+                  >
+                    <LockIcon size={14} className="shrink-0" />
+                    <span>Langsung Dibekukan</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200/80 dark:border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 hover:bg-slate-200/70 dark:bg-white/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isCreatingUser}
+                  className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 active:scale-95 text-white shadow-md shadow-blue-600/30 transition-all cursor-pointer disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isCreatingUser ? (
+                    <>
+                      <div className="h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Mendaftarkan...</span>
+                    </>
+                  ) : (
+                    <span>Simpan & Daftarkan Pengguna</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 2: Edit Pengguna Lengkap (Profil, Role, Status, Password Baru)     */}
+      {/* ========================================================================= */}
+      {selectedUserForEdit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={() => !isUpdatingUser && setSelectedUserForEdit(null)}
+          />
+
+          <div className="relative w-full max-w-lg rounded-3xl bg-white dark:bg-[#0b132b] border border-slate-200 dark:border-blue-500/20 p-6 sm:p-7 shadow-2xl animate-in zoom-in-95 duration-200 z-10 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-200/80 dark:border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                  <EditIcon size={18} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white leading-tight">
+                    Edit Akun Pengguna
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    ID #{selectedUserForEdit.id} • @{selectedUserForEdit.username}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedUserForEdit(null)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+              >
+                <CloseIcon size={20} />
+              </button>
+            </div>
+
+            {editError && (
+              <div className="my-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs font-medium">
+                {editError}
+              </div>
+            )}
+
+            <form onSubmit={handleConfirmUpdateUser} className="space-y-4 my-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Nama Lengkap *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editFormData.name}
+                  onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Username *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editFormData.username}
+                    onChange={(e) =>
+                      setEditFormData({
+                        ...editFormData,
+                        username: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""),
+                      })
+                    }
+                    className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Alamat Email *
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={editFormData.email}
+                    onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value.toLowerCase() })}
+                    className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Role */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                  Role Akses: {selectedUserForEdit.id === 1 && "(Superadmin Terkunci)"}
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    disabled={selectedUserForEdit.id === 1}
+                    onClick={() => setEditFormData({ ...editFormData, role: "user" })}
+                    className={`flex flex-col items-center gap-1 p-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+                      selectedUserForEdit.id === 1
+                        ? "opacity-40 cursor-not-allowed"
+                        : editFormData.role === "user"
+                        ? "bg-sky-50 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400 border-sky-500"
+                        : "bg-slate-50 dark:bg-white/5 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-white/10"
+                    }`}
+                  >
+                    <UserIcon size={16} />
+                    <span>Pembeli</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={selectedUserForEdit.id === 1}
+                    onClick={() => setEditFormData({ ...editFormData, role: "penjual" })}
+                    className={`flex flex-col items-center gap-1 p-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+                      selectedUserForEdit.id === 1
+                        ? "opacity-40 cursor-not-allowed"
+                        : editFormData.role === "penjual"
+                        ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-500"
+                        : "bg-slate-50 dark:bg-white/5 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-white/10"
+                    }`}
+                  >
+                    <ShoppingBagIcon size={16} />
+                    <span>Penjual</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={selectedUserForEdit.id === 1}
+                    onClick={() => setEditFormData({ ...editFormData, role: "admin" })}
+                    className={`flex flex-col items-center gap-1 p-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+                      selectedUserForEdit.id === 1
+                        ? "bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border-purple-500"
+                        : editFormData.role === "admin"
+                        ? "bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border-purple-500"
+                        : "bg-slate-50 dark:bg-white/5 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-white/10"
+                    }`}
+                  >
+                    <ShieldIcon size={16} />
+                    <span>Admin</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Status Akun */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                  Status Akun:
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    disabled={selectedUserForEdit.id === 1 || currentUser?.id === selectedUserForEdit.id}
+                    onClick={() => setEditFormData({ ...editFormData, status: "active" })}
+                    className={`flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                      editFormData.status === "active"
+                        ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-500"
+                        : "bg-slate-50 dark:bg-white/5 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-white/10"
+                    }`}
+                  >
+                    <CheckCircleIcon size={14} className="shrink-0" />
+                    <span>Aktif</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={selectedUserForEdit.id === 1 || currentUser?.id === selectedUserForEdit.id}
+                    onClick={() => setEditFormData({ ...editFormData, status: "suspended" })}
+                    className={`flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                      editFormData.status === "suspended"
+                        ? "bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border-rose-500"
+                        : "bg-slate-50 dark:bg-white/5 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-white/10"
+                    }`}
+                  >
+                    <LockIcon size={14} className="shrink-0" />
+                    <span>Dibekukan</span>
+                  </button>
+                </div>
+                {editFormData.status === "suspended" && (
+                  <div className="mt-2">
+                    <input
+                      type="text"
+                      value={editFormData.reason}
+                      onChange={(e) => setEditFormData({ ...editFormData, reason: e.target.value })}
+                      placeholder="Alasan pembekuan (akan dibaca user)..."
+                      className="w-full px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Ganti Password Baru (Opsional) */}
+              <div className="pt-2 border-t border-slate-200/80 dark:border-white/10">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Ubah Kata Sandi (Opsional)
+                </label>
+                <div className="relative">
+                  <input
+                    type={showEditPassword ? "text" : "password"}
+                    value={editFormData.newPassword}
+                    onChange={(e) => setEditFormData({ ...editFormData, newPassword: e.target.value })}
+                    placeholder="Biarkan kosong jika tidak ingin mengubah password"
+                    className="w-full pl-3.5 pr-10 py-2.5 rounded-xl text-sm bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowEditPassword((prev) => !prev)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+                  >
+                    {showEditPassword ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
+                  </button>
+                </div>
+                <p className="mt-1 text-[11px] text-slate-400">
+                  Minimal 6 karakter jika ingin mengganti kata sandi pengguna ini.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200/80 dark:border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setSelectedUserForEdit(null)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 hover:bg-slate-200/70 dark:bg-white/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUpdatingUser}
+                  className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 active:scale-98 text-white shadow-md shadow-blue-600/30 transition-all cursor-pointer disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isUpdatingUser ? (
+                    <>
+                      <div className="h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Menyimpan...</span>
+                    </>
+                  ) : (
+                    <span>Simpan Perubahan</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 3: Reset Kata Sandi Langsung                                       */}
+      {/* ========================================================================= */}
+      {selectedUserForResetPassword && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={() => !isResettingPassword && setSelectedUserForResetPassword(null)}
+          />
+
+          <div className="relative w-full max-w-md rounded-3xl bg-white dark:bg-[#0b132b] border border-slate-200 dark:border-amber-500/20 p-6 sm:p-7 shadow-2xl animate-in zoom-in-95 duration-200 z-10">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-200/80 dark:border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                  <KeyIcon size={18} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white leading-tight">
+                    Reset Kata Sandi
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Untuk akun {selectedUserForResetPassword.name} (@{selectedUserForResetPassword.username})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedUserForResetPassword(null)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+              >
+                <CloseIcon size={20} />
+              </button>
+            </div>
+
+            {resetPasswordResult ? (
+              <div className="my-5 space-y-4">
+                <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-500/30 text-center">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-500 mx-auto mb-2">
+                    <CheckIcon size={20} />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                    Kata Sandi Baru Berhasil Dibuat!
+                  </h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-3">
+                    Berikan kata sandi sementara ini kepada pemilik akun:
+                  </p>
+                  <div className="p-3 rounded-xl bg-white dark:bg-[#0f172a] border border-emerald-500/30 flex items-center justify-between">
+                    <span className="font-mono text-base font-bold text-emerald-600 dark:text-emerald-400 tracking-wider">
+                      {resetPasswordResult}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleCopyNewPassword}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-500 transition-colors cursor-pointer"
+                    >
+                      {isPasswordCopied ? "Tersalin!" : "Salin"}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedUserForResetPassword(null)}
+                  className="w-full py-2.5 rounded-xl text-xs font-semibold bg-slate-900 text-white dark:bg-white dark:text-slate-900 transition-colors cursor-pointer"
+                >
+                  Selesai
+                </button>
+              </div>
+            ) : (
+              <div className="my-4 space-y-4">
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  Sistem akan mengganti kata sandi akun ini. Anda dapat memasukkan kata sandi kustom atau mengosongkannya agar sistem menghasilkan kata sandi otomatis.
+                </p>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Kata Sandi Kustom (Opsional):
+                  </label>
+                  <input
+                    type="text"
+                    value={resetCustomPassword}
+                    onChange={(e) => setResetCustomPassword(e.target.value)}
+                    placeholder="Kosongkan untuk kata sandi acak otomatis..."
+                    className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200/80 dark:border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedUserForResetPassword(null)}
+                    className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 hover:bg-slate-200/70 dark:bg-white/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConfirmResetPassword}
+                    disabled={isResettingPassword}
+                    className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-amber-600 hover:bg-amber-500 active:scale-98 text-white shadow-md shadow-amber-600/30 transition-all cursor-pointer disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {isResettingPassword ? (
+                      <>
+                        <div className="h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Mereset...</span>
+                      </>
+                    ) : (
+                      <span>Reset Kata Sandi Sekarang</span>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 4: Detail Pengguna Lengkap (Drawer / Card View)                    */}
+      {/* ========================================================================= */}
+      {selectedUserForDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={() => setSelectedUserForDetail(null)}
+          />
+
+          <div className="relative w-full max-w-md rounded-3xl bg-white dark:bg-[#0b132b] border border-slate-200 dark:border-white/10 p-6 sm:p-7 shadow-2xl animate-in zoom-in-95 duration-200 z-10">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-200/80 dark:border-white/10">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                Rincian Lengkap Pengguna
+              </h3>
+              <button
+                type="button"
+                onClick={() => setSelectedUserForDetail(null)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+              >
+                <CloseIcon size={20} />
+              </button>
+            </div>
+
+            <div className="my-5 text-center">
+              <div
+                className={`flex h-18 w-18 items-center justify-center rounded-3xl bg-gradient-to-tr ${getAvatarGradient(
+                  selectedUserForDetail.name,
+                  selectedUserForDetail.role
+                )} text-white font-extrabold text-2xl mx-auto shadow-lg mb-3`}
+              >
+                {selectedUserForDetail.name[0]?.toUpperCase()}
+              </div>
+              <h4 className="text-lg font-bold text-slate-900 dark:text-white">
+                {selectedUserForDetail.name}
+              </h4>
+              <p className="text-xs text-slate-400">
+                @{selectedUserForDetail.username} • {selectedUserForDetail.email}
+              </p>
+              <div className="mt-3 flex items-center justify-center gap-2">
+                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-300">
+                  ID #{selectedUserForDetail.id}
+                </span>
+                <span
+                  className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                    selectedUserForDetail.role === "admin"
+                      ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/25"
+                      : selectedUserForDetail.role === "penjual"
+                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25"
+                      : "bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/25"
+                  }`}
+                >
+                  {selectedUserForDetail.role.toUpperCase()}
+                </span>
+                <span
+                  className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                    selectedUserForDetail.status === "active"
+                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25"
+                      : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/25"
+                  }`}
+                >
+                  {selectedUserForDetail.status === "active" ? "Aktif" : "Dibekukan"}
+                </span>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/[0.03] border border-slate-200/80 dark:border-white/10 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Terdaftar Pada:</span>
+                <span className="font-semibold text-slate-900 dark:text-white">
+                  {formatDate(selectedUserForDetail.created_at)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Terakhir Diperbarui:</span>
+                <span className="font-semibold text-slate-900 dark:text-white">
+                  {formatDate(selectedUserForDetail.updated_at || selectedUserForDetail.created_at)}
+                </span>
+              </div>
+              {selectedUserForDetail.suspension_reason && (
+                <div className="pt-2 border-t border-slate-200/60 dark:border-white/5">
+                  <span className="block text-slate-400 mb-0.5">Alasan Pembekuan:</span>
+                  <span className="font-medium text-rose-600 dark:text-rose-400">
+                    {selectedUserForDetail.suspension_reason}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Shortcut Aksi Langsung dari Detail */}
+            <div className="mt-5 grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const target = selectedUserForDetail;
+                  setSelectedUserForDetail(null);
+                  handleOpenEditModal(target);
+                }}
+                className="py-2 px-3 rounded-xl text-xs font-semibold bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 border border-blue-500/20 hover:bg-blue-100 transition-colors cursor-pointer text-center"
+              >
+                Edit Akun
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const target = selectedUserForDetail;
+                  setSelectedUserForDetail(null);
+                  handleOpenResetPasswordModal(target);
+                }}
+                className="py-2 px-3 rounded-xl text-xs font-semibold bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border border-amber-500/20 hover:bg-amber-100 transition-colors cursor-pointer text-center"
+              >
+                Reset Sandi
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const target = selectedUserForDetail;
+                  setSelectedUserForDetail(null);
+                  setSelectedUserForStatus(target);
+                  setTargetStatusValue(target.status === "suspended" ? "active" : "suspended");
+                }}
+                className="py-2 px-3 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-300 hover:bg-slate-200 transition-colors cursor-pointer text-center"
+              >
+                Ubah Status
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 5: Protokol Pembekuan Akun Pengguna                                */}
+      {/* ========================================================================= */}
       {selectedUserForStatus && targetStatusValue === "suspended" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
@@ -1117,20 +2062,10 @@ export const UserManagementView: React.FC = () => {
           />
 
           <div className="relative w-full max-w-lg rounded-3xl bg-white dark:bg-[#0b132b] border border-slate-200 dark:border-rose-500/20 p-6 sm:p-7 shadow-2xl animate-in zoom-in-95 duration-200 z-10 max-h-[90vh] overflow-y-auto">
-            {/* Header Modal */}
             <div className="flex items-center justify-between pb-4 border-b border-slate-200/80 dark:border-white/10">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
                     <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                   </svg>
@@ -1153,7 +2088,6 @@ export const UserManagementView: React.FC = () => {
               </button>
             </div>
 
-            {/* Snapshot Profil Pengguna */}
             <div className="my-4 p-3.5 rounded-2xl bg-slate-50 dark:bg-white/[0.03] border border-slate-200/80 dark:border-white/10 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div
@@ -1183,7 +2117,6 @@ export const UserManagementView: React.FC = () => {
               </span>
             </div>
 
-            {/* Pilihan Alasan Pembekuan Terstruktur dengan Ikon Grafis SVG */}
             <div className="space-y-3">
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                 1. Pilih Kategori Alasan Pembekuan:
@@ -1230,45 +2163,19 @@ export const UserManagementView: React.FC = () => {
               </div>
             </div>
 
-            {/* Input Catatan Investigasi Admin */}
             <div className="mt-4 space-y-1.5">
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                2. Catatan Tambahan Admin (Akan Ditampilkan ke Pengguna):
+                2. Catatan Tambahan Admin (Ditampilkan di Popup User):
               </label>
               <textarea
                 value={customNote}
                 onChange={(e) => setCustomNote(e.target.value)}
-                placeholder="Tuliskan alasan spesifik atau catatan yang akan dibaca pengguna saat popup muncul..."
+                placeholder="Tuliskan catatan khusus atau alasan tambahan untuk pengguna..."
                 rows={2}
                 className="w-full p-3 rounded-xl text-xs bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500 transition-all resize-none"
               />
             </div>
 
-            {/* Ringkasan Dampak Sistematis */}
-            <div className="mt-4 p-3.5 rounded-xl bg-rose-500/5 dark:bg-rose-500/10 border border-rose-500/20 text-xs space-y-1.5 text-slate-700 dark:text-slate-300">
-              <div className="flex items-center gap-2 font-bold text-rose-600 dark:text-rose-400">
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-                </svg>
-                <span>Dampak Langsung ke Sisi Pengguna:</span>
-              </div>
-              <ul className="list-disc list-inside space-y-1 text-[11px] text-slate-600 dark:text-slate-300 pl-1">
-                <li>Sesi pengguna langsung diputus seketika melalui sinkronisasi background realtime.</li>
-                <li>Popup notifikasi pembekuan akun akan muncul di layar pengguna lengkap dengan alasan yang Anda tentukan di atas.</li>
-                <li>Pengguna hanya memiliki opsi keluar sesi (logout) dan diarahkan kembali ke beranda.</li>
-              </ul>
-            </div>
-
-            {/* Aksi Konfirmasi */}
             <div className="mt-6 flex items-center gap-3 pt-3 border-t border-slate-200/80 dark:border-white/10">
               <button
                 type="button"
@@ -1286,7 +2193,7 @@ export const UserManagementView: React.FC = () => {
                 {isUpdatingStatus ? (
                   <>
                     <div className="h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Menerapkan Protokol...</span>
+                    <span>Menerapkan...</span>
                   </>
                 ) : (
                   <span>Terapkan Pembekuan Akun</span>
@@ -1297,7 +2204,9 @@ export const UserManagementView: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL 2: Protokol Reaktivasi Akun Pengguna (Sistematis & Elegan) */}
+      {/* ========================================================================= */}
+      {/* MODAL 6: Protokol Reaktivasi Akun Pengguna                              */}
+      {/* ========================================================================= */}
       {selectedUserForStatus && targetStatusValue === "active" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
@@ -1306,7 +2215,6 @@ export const UserManagementView: React.FC = () => {
           />
 
           <div className="relative w-full max-w-md rounded-3xl bg-white dark:bg-[#0b132b] border border-slate-200 dark:border-emerald-500/20 p-6 sm:p-7 shadow-2xl animate-in zoom-in-95 duration-200 z-10">
-            {/* Header Modal Reaktivasi */}
             <div className="flex items-center justify-between pb-4 border-b border-slate-200/80 dark:border-white/10">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
@@ -1330,7 +2238,6 @@ export const UserManagementView: React.FC = () => {
               </button>
             </div>
 
-            {/* Detail Akun yang Direaktivasi */}
             <div className="my-4 p-4 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-500/20 flex items-center gap-3">
               <div
                 className={`flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-tr ${getAvatarGradient(
@@ -1351,36 +2258,9 @@ export const UserManagementView: React.FC = () => {
                   <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
                   Status Saat Ini: Dibekukan
                 </span>
-                {selectedUserForStatus.suspension_reason && (
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 italic">
-                    Alasan: &quot;{selectedUserForStatus.suspension_reason}&quot;
-                  </p>
-                )}
               </div>
             </div>
 
-            {/* Poin Pemulihan Akses */}
-            <div className="space-y-2 text-xs text-slate-600 dark:text-slate-300">
-              <p className="font-semibold text-slate-900 dark:text-white">
-                Setelah diaktifkan kembali:
-              </p>
-              <div className="p-3 rounded-xl bg-slate-50 dark:bg-white/[0.03] border border-slate-200/80 dark:border-white/10 space-y-1.5 text-[11px]">
-                <div className="flex items-center gap-2">
-                  <CheckIcon size={14} className="text-emerald-500 shrink-0" />
-                  <span>Pengguna dapat kembali login menggunakan kredensial lamanya.</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckIcon size={14} className="text-emerald-500 shrink-0" />
-                  <span>Keranjang, riwayat pesanan, atau toko mitra kembali berfungsi penuh.</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckIcon size={14} className="text-emerald-500 shrink-0" />
-                  <span>Notifikasi pembekuan di sisi pengguna akan dinonaktifkan.</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Aksi Konfirmasi Reaktivasi */}
             <div className="mt-6 flex items-center gap-3 pt-3 border-t border-slate-200/80 dark:border-white/10">
               <button
                 type="button"
@@ -1409,7 +2289,9 @@ export const UserManagementView: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL 3: Protokol Aksi Massal (Bulk Status Update) */}
+      {/* ========================================================================= */}
+      {/* MODAL 7: Protokol Aksi Massal (Bulk Status Update)                       */}
+      {/* ========================================================================= */}
       {isBulkModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
@@ -1419,41 +2301,11 @@ export const UserManagementView: React.FC = () => {
 
           <div className="relative w-full max-w-lg rounded-3xl bg-white dark:bg-[#0b132b] border border-slate-200 dark:border-blue-500/20 p-6 sm:p-7 shadow-2xl animate-in zoom-in-95 duration-200 z-10 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-4 border-b border-slate-200/80 dark:border-white/10">
-              <div className="flex items-center gap-3">
-                <div
-                  className={`flex h-10 w-10 items-center justify-center rounded-2xl ${
-                    bulkTargetStatus === "suspended"
-                      ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
-                      : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                  }`}
-                >
-                  {bulkTargetStatus === "suspended" ? (
-                    <svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
-                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                    </svg>
-                  ) : (
-                    <CheckIcon size={20} />
-                  )}
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900 dark:text-white leading-tight">
-                    {bulkTargetStatus === "suspended"
-                      ? "Pembekuan Akun Massal"
-                      : "Reaktivasi Akun Massal"}
-                  </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Terapkan status ke {selectedUserIds.length} akun pengguna terpilih
-                  </p>
-                </div>
-              </div>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white leading-tight">
+                {bulkTargetStatus === "suspended"
+                  ? "Pembekuan Akun Massal"
+                  : "Reaktivasi Akun Massal"}
+              </h3>
               <button
                 type="button"
                 onClick={() => setIsBulkModalOpen(false)}
@@ -1473,62 +2325,6 @@ export const UserManagementView: React.FC = () => {
               </span>
             </div>
 
-            {bulkTargetStatus === "suspended" && (
-              <div className="space-y-3">
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                  Pilih Alasan Pembekuan Massal:
-                </label>
-                <div className="grid grid-cols-1 gap-2">
-                  {SUSPENSION_REASONS.map((reason) => {
-                    const isChecked = selectedReasonId === reason.id;
-                    return (
-                      <div
-                        key={reason.id}
-                        onClick={() => setSelectedReasonId(reason.id)}
-                        className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
-                          isChecked
-                            ? "bg-rose-50/60 dark:bg-rose-950/20 border-rose-500 dark:border-rose-500/40"
-                            : "bg-white dark:bg-white/[0.02] border-slate-200 dark:border-white/10"
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <ReasonIconBadge reasonId={reason.id} className="h-8 w-8" />
-                          <div>
-                            <p className="text-xs font-semibold text-slate-900 dark:text-white">
-                              {reason.label}
-                            </p>
-                            <p className="text-[10px] text-slate-400">{reason.desc}</p>
-                          </div>
-                        </div>
-                        <div
-                          className={`h-4 w-4 rounded-full border flex items-center justify-center shrink-0 ${
-                            isChecked
-                              ? "border-rose-600 bg-rose-600 text-white"
-                              : "border-slate-300 dark:border-white/20"
-                          }`}
-                        >
-                          {isChecked && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="mt-3">
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">
-                    Catatan Massal (Opsional):
-                  </label>
-                  <input
-                    type="text"
-                    value={customNote}
-                    onChange={(e) => setCustomNote(e.target.value)}
-                    placeholder="Alasan singkat atau nomor log..."
-                    className="w-full p-2.5 rounded-xl text-xs bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-500"
-                  />
-                </div>
-              </div>
-            )}
-
             <div className="mt-6 flex items-center gap-3 pt-3 border-t border-slate-200/80 dark:border-white/10">
               <button
                 type="button"
@@ -1543,7 +2339,7 @@ export const UserManagementView: React.FC = () => {
                 disabled={isUpdatingBulk}
                 className={`flex-1 py-2.5 rounded-xl text-xs font-semibold text-white shadow-md transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 ${
                   bulkTargetStatus === "suspended"
-                    ? "bg-rose-600 hover:bg-rose-700 shadow-rose-600/30"
+                    ? "bg-amber-600 hover:bg-amber-700 shadow-amber-600/30"
                     : "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/30"
                 }`}
               >
@@ -1564,121 +2360,52 @@ export const UserManagementView: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL 4: Ubah Role Pengguna */}
-      {selectedUserForRole && (
+      {/* ========================================================================= */}
+      {/* MODAL 8: Konfirmasi Hapus Massal (Bulk Delete)                           */}
+      {/* ========================================================================= */}
+      {isBulkDeleteModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
-            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200"
-            onClick={() => setSelectedUserForRole(null)}
+            className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={() => !isBulkDeleting && setIsBulkDeleteModalOpen(false)}
           />
 
-          <div className="relative w-full max-w-md rounded-2xl bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-white/10 p-6 shadow-2xl animate-in zoom-in-95 duration-200 z-10">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200/80 dark:border-white/10">
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                Ubah Role Pengguna
-              </h3>
-              <button
-                type="button"
-                onClick={() => setSelectedUserForRole(null)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-white"
-              >
-                <CloseIcon size={18} />
-              </button>
+          <div className="relative w-full max-w-sm rounded-3xl bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-rose-500/20 p-6 shadow-2xl animate-in zoom-in-95 duration-200 z-10 text-center">
+            <div className="flex items-center justify-center h-14 w-14 rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 mx-auto mb-4 border border-rose-500/20">
+              <TrashIcon size={26} />
             </div>
 
-            <div className="py-4 space-y-4">
-              <div className="p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 flex items-center gap-3">
-                <div
-                  className={`flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr ${getAvatarGradient(
-                    selectedUserForRole.name,
-                    selectedUserForRole.role
-                  )} text-white font-bold text-sm`}
-                >
-                  {selectedUserForRole.name[0]?.toUpperCase()}
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                    {selectedUserForRole.name}
-                  </p>
-                  <p className="text-xs text-slate-400">
-                    @{selectedUserForRole.username} • {selectedUserForRole.email}
-                  </p>
-                </div>
-              </div>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+              Hapus {selectedUserIds.length} Akun Terpilih?
+            </h3>
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              Tindakan ini bersifat permanen. Seluruh akun yang dipilih akan dihapus dari sistem.
+            </p>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                  Pilih Role Baru:
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setNewRoleValue("user")}
-                    className={`flex flex-col items-center gap-1.5 p-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                      newRoleValue === "user"
-                        ? "bg-sky-50 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400 border-sky-500 shadow-xs"
-                        : "bg-slate-50 dark:bg-white/5 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-white/10 hover:border-slate-300"
-                    }`}
-                  >
-                    <UserIcon size={18} />
-                    <span>Pembeli</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setNewRoleValue("penjual")}
-                    className={`flex flex-col items-center gap-1.5 p-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                      newRoleValue === "penjual"
-                        ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-500 shadow-xs"
-                        : "bg-slate-50 dark:bg-white/5 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-white/10 hover:border-slate-300"
-                    }`}
-                  >
-                    <ShoppingBagIcon size={18} />
-                    <span>Penjual</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setNewRoleValue("admin")}
-                    className={`flex flex-col items-center gap-1.5 p-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                      newRoleValue === "admin"
-                        ? "bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border-purple-500 shadow-xs"
-                        : "bg-slate-50 dark:bg-white/5 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-white/10 hover:border-slate-300"
-                    }`}
-                  >
-                    <ShieldIcon size={18} />
-                    <span>Admin</span>
-                  </button>
-                </div>
-              </div>
-
-              <p className="text-[11px] text-slate-400">
-                Pengubahan role akan langsung mengubah hak akses akun pengguna pada sesi berikutnya.
-              </p>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200/80 dark:border-white/10">
+            <div className="mt-6 flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setSelectedUserForRole(null)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                onClick={() => setIsBulkDeleteModalOpen(false)}
+                className="flex-1 py-2.5 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 hover:bg-slate-200/70 dark:bg-white/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
               >
                 Batal
               </button>
               <button
                 type="button"
-                onClick={handleConfirmUpdateRole}
-                disabled={isUpdatingRole || newRoleValue === selectedUserForRole.role}
-                className="px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white shadow-xs transition-colors cursor-pointer"
+                onClick={handleConfirmBulkDelete}
+                disabled={isBulkDeleting}
+                className="flex-1 py-2.5 rounded-xl text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 shadow-md shadow-rose-600/30 transition-colors cursor-pointer disabled:opacity-50"
               >
-                {isUpdatingRole ? "Menyimpan..." : "Simpan Perubahan"}
+                {isBulkDeleting ? "Menghapus..." : `Ya, Hapus (${selectedUserIds.length})`}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL 5: Konfirmasi Hapus Pengguna */}
+      {/* ========================================================================= */}
+      {/* MODAL 9: Konfirmasi Hapus Pengguna Tunggal                               */}
+      {/* ========================================================================= */}
       {selectedUserForDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div

@@ -262,4 +262,167 @@ describe("Admin User Management API - GET /api/admin/users & Actions", () => {
     await request(app).delete(`/api/admin/users/${idA}`).set("Authorization", `Bearer ${adminToken}`);
     await request(app).delete(`/api/admin/users/${idB}`).set("Authorization", `Bearer ${adminToken}`);
   });
+
+  it("admin harus dapat menambahkan pengguna baru (Pembeli, Penjual, Admin) via POST /api/admin/users", async () => {
+    const timestamp = Date.now();
+    const newUserRes = await request(app)
+      .post("/api/admin/users")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        name: "Penjual Mitra Baru",
+        username: `mitra_${timestamp}`,
+        email: `mitra_${timestamp}@shop.id`,
+        password: "password12345",
+        role: "penjual",
+        status: "active",
+      });
+
+    expect(newUserRes.status).toBe(201);
+    expect(newUserRes.body.success).toBe(true);
+    expect(newUserRes.body.user).toBeDefined();
+    expect(newUserRes.body.user.role).toBe("penjual");
+    expect(newUserRes.body.user.name).toBe("Penjual Mitra Baru");
+
+    const createdId = newUserRes.body.user.id;
+
+    // Uji validasi duplikasi username
+    const duplicateRes = await request(app)
+      .post("/api/admin/users")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        name: "Penjual Kloning",
+        username: `mitra_${timestamp}`,
+        email: `kloning_${timestamp}@shop.id`,
+        password: "password12345",
+        role: "penjual",
+      });
+    expect(duplicateRes.status).toBe(400);
+    expect(duplicateRes.body.message).toContain("sudah terdaftar");
+
+    // Bersihkan user baru
+    await request(app).delete(`/api/admin/users/${createdId}`).set("Authorization", `Bearer ${adminToken}`);
+  });
+
+  it("admin harus dapat mengedit data pengguna via PUT /api/admin/users/:id", async () => {
+    const timestamp = Date.now();
+    const createRes = await request(app)
+      .post("/api/admin/users")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        name: "Pengguna Edit Uji",
+        username: `edituji_${timestamp}`,
+        email: `edituji_${timestamp}@test.id`,
+        password: "password12345",
+        role: "user",
+        status: "active",
+      });
+    expect(createRes.status).toBe(201);
+    const userId = createRes.body.user.id;
+
+    const updateRes = await request(app)
+      .put(`/api/admin/users/${userId}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        name: "Pengguna Edit Diperbarui",
+        username: `edituji_${timestamp}_v2`,
+        email: `edituji_${timestamp}_v2@test.id`,
+        role: "penjual",
+        status: "suspended",
+        reason: "Tinjauan Kepatuhan Usaha",
+      });
+
+    expect(updateRes.status).toBe(200);
+    expect(updateRes.body.success).toBe(true);
+    expect(updateRes.body.user.name).toBe("Pengguna Edit Diperbarui");
+    expect(updateRes.body.user.role).toBe("penjual");
+    expect(updateRes.body.user.status).toBe("suspended");
+    expect(updateRes.body.user.suspension_reason).toBe("Tinjauan Kepatuhan Usaha");
+
+    // Bersihkan
+    await request(app).delete(`/api/admin/users/${userId}`).set("Authorization", `Bearer ${adminToken}`);
+  });
+
+  it("admin dapat mereset kata sandi pengguna via POST /api/admin/users/:id/reset-password", async () => {
+    const timestamp = Date.now();
+    const createRes = await request(app)
+      .post("/api/admin/users")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        name: "User Reset Pwd",
+        username: `resetpwd_${timestamp}`,
+        email: `resetpwd_${timestamp}@test.id`,
+        password: "lama12345",
+        role: "user",
+      });
+    expect(createRes.status).toBe(201);
+    const userId = createRes.body.user.id;
+
+    // Reset dengan auto generate
+    const resetRes = await request(app)
+      .post(`/api/admin/users/${userId}/reset-password`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({});
+
+    expect(resetRes.status).toBe(200);
+    expect(resetRes.body.success).toBe(true);
+    const tempPass = resetRes.body.temporaryPassword || resetRes.body.newPassword;
+    expect(tempPass).toBeDefined();
+    expect(tempPass.length).toBeGreaterThanOrEqual(10);
+
+    // Verifikasi user dapat login menggunakan password baru
+    const loginRes = await request(app).post("/api/auth/login").send({
+      identifier: `resetpwd_${timestamp}`,
+      password: tempPass,
+    });
+    expect(loginRes.status).toBe(200);
+    expect(loginRes.body.user.id).toBe(userId);
+
+    // Bersihkan
+    await request(app).delete(`/api/admin/users/${userId}`).set("Authorization", `Bearer ${adminToken}`);
+  });
+
+  it("admin dapat menghapus banyak pengguna secara massal via POST /api/admin/users/bulk-delete", async () => {
+    const timestamp = Date.now();
+    const u1 = await request(app)
+      .post("/api/admin/users")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        name: "Bulk Del 1",
+        username: `bdel1_${timestamp}`,
+        email: `bdel1_${timestamp}@test.id`,
+        password: "password12345",
+        role: "user",
+      });
+    const u2 = await request(app)
+      .post("/api/admin/users")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        name: "Bulk Del 2",
+        username: `bdel2_${timestamp}`,
+        email: `bdel2_${timestamp}@test.id`,
+        password: "password12345",
+        role: "user",
+      });
+
+    const id1 = u1.body.user.id;
+    const id2 = u2.body.user.id;
+
+    // Hapus massal (menyertakan ID 1 superadmin untuk memverifikasi filter proteksi)
+    const bulkDelRes = await request(app)
+      .post("/api/admin/users/bulk-delete")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        userIds: [id1, id2, 1],
+      });
+
+    expect(bulkDelRes.status).toBe(200);
+    expect(bulkDelRes.body.success).toBe(true);
+    expect(bulkDelRes.body.deletedCount).toBe(2);
+
+    // Pastikan admin masih tetap ada
+    const checkAdmin = await request(app)
+      .get("/api/admin/users?search=admin")
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(checkAdmin.body.data.some((u: { username: string }) => u.username === "admin")).toBe(true);
+  });
 });

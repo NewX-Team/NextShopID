@@ -132,6 +132,135 @@ export const adminService = {
   },
 
   /**
+   * Menambahkan pengguna baru (Pembeli, Penjual, atau Admin): POST /api/admin/users
+   */
+  async createUser(
+    token: string,
+    data: {
+      name: string;
+      username: string;
+      email: string;
+      password: string;
+      role: UserRole;
+      status?: UserStatus;
+    }
+  ): Promise<{ success: boolean; message?: string; user?: AdminUserItem }> {
+    try {
+      const response = await fetch(`${API_URL}/admin/users`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error("[adminService.createUser] Error:", error);
+      return {
+        success: false,
+        message: "Gagal terhubung ke server saat menambahkan pengguna.",
+      };
+    }
+  },
+
+  /**
+   * Mengedit data pengguna (Profil, Role, Status, Password Baru): PUT /api/admin/users/:id
+   */
+  async updateUser(
+    token: string,
+    userId: number,
+    data: {
+      name?: string;
+      username?: string;
+      email?: string;
+      role?: UserRole;
+      status?: UserStatus;
+      newPassword?: string;
+      reason?: string;
+    }
+  ): Promise<{ success: boolean; message?: string; user?: AdminUserItem }> {
+    try {
+      const response = await fetch(`${API_URL}/admin/users/${userId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error("[adminService.updateUser] Error:", error);
+      return {
+        success: false,
+        message: "Gagal terhubung ke server saat memperbarui pengguna.",
+      };
+    }
+  },
+
+  /**
+   * Reset password pengguna langsung oleh admin: POST /api/admin/users/:id/reset-password
+   */
+  async resetUserPassword(
+    token: string,
+    userId: number,
+    customPassword?: string
+  ): Promise<{ success: boolean; message?: string; newPassword?: string }> {
+    try {
+      const response = await fetch(`${API_URL}/admin/users/${userId}/reset-password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ customPassword }),
+      });
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error("[adminService.resetUserPassword] Error:", error);
+      return {
+        success: false,
+        message: "Gagal mereset kata sandi pengguna.",
+      };
+    }
+  },
+
+  /**
+   * Menghapus banyak akun sekaligus (Bulk Delete): POST /api/admin/users/bulk-delete
+   */
+  async bulkDeleteUsers(
+    token: string,
+    userIds: number[]
+  ): Promise<{ success: boolean; message?: string; deletedCount?: number }> {
+    try {
+      const response = await fetch(`${API_URL}/admin/users/bulk-delete`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ userIds }),
+      });
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error("[adminService.bulkDeleteUsers] Error:", error);
+      return {
+        success: false,
+        message: "Gagal menghapus pengguna secara massal.",
+      };
+    }
+  },
+
+  /**
    * Menghapus pengguna: DELETE /api/admin/users/:id
    */
   async deleteUser(

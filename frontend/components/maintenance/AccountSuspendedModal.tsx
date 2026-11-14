@@ -3,6 +3,7 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { LockIcon } from "@/components/ui/icons";
 
 /**
  * Modal Popup Notifikasi saat Akun User Dibekukan (Nonaktif) oleh Admin:
@@ -65,7 +66,7 @@ export const AccountSuspendedModal: React.FC = () => {
 
         {/* Badge Info Status */}
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 mb-3">
-          <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
+          <LockIcon size={12} className="text-rose-500 shrink-0" />
           <span>Akun Dibekukan</span>
         </div>
 
