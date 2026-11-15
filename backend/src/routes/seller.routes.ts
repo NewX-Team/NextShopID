@@ -22,4 +22,8 @@ router.get("/payout-accounts", sellerController.getPayoutAccounts.bind(sellerCon
 router.post("/payout-accounts", sellerController.addPayoutAccount.bind(sellerController));
 router.delete("/payout-accounts/:id", sellerController.deletePayoutAccount.bind(sellerController));
 
+// Penarikan Dana (Withdrawal / WD)
+router.get("/withdrawals", sellerController.getWithdrawals.bind(sellerController));
+router.post("/withdrawals", sellerController.requestWithdrawal.bind(sellerController));
+
 export const sellerRoutes = router;

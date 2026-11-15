@@ -224,6 +224,15 @@ export default function PenjualPage() {
                 setSellerProfile(updated);
                 fetchSellerData();
               }}
+              onBalanceUpdated={(newBalance) => {
+                setStoreBalance(newBalance);
+                if (sellerProfile) {
+                  setSellerProfile({
+                    ...sellerProfile,
+                    balance: newBalance,
+                  });
+                }
+              }}
             />
           </div>
         </main>

@@ -19,6 +19,28 @@ export interface SellerPayoutAccountItem {
   updatedAt: string;
 }
 
+export type WithdrawalStatus = "pending" | "processing" | "completed" | "rejected";
+
+export interface SellerWithdrawalItem {
+  id: number;
+  sellerId: number;
+  payoutAccountId: number;
+  accountType: string;
+  providerName: string;
+  accountNumber: string;
+  accountHolderName: string;
+  amount: number;
+  fee: number;
+  netAmount: number;
+  status: WithdrawalStatus;
+  notes: string | null;
+  adminNotes?: string | null;
+  rejectionReason?: string | null;
+  reviewedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface SellerVerificationPayload {
   ownerName: string;
   idCardNumber: string;
@@ -659,6 +681,287 @@ export class SellerController {
       res.status(500).json({
         success: false,
         message: "Gagal menghapus akun penarikan dana.",
+      });
+    }
+  }
+
+  /**
+   * Mengambil riwayat pengajuan penarikan dana (WD) penjual
+   * GET /api/seller/withdrawals
+   */
+  async getWithdrawals(req: Request, res: Response): Promise<void> {
+    try {
+      const sellerId = req.user?.id;
+      if (!sellerId) {
+        res.status(401).json({
+          success: false,
+          message: "Tidak terautentikasi.",
+        });
+        return;
+      }
+
+      const stmt = db.prepare(`
+        SELECT id, seller_id, payout_account_id, account_type, provider_name, account_number,
+               account_holder_name, amount, fee, net_amount, status, notes, admin_notes,
+               rejection_reason, reviewed_at, created_at, updated_at
+        FROM seller_withdrawals
+        WHERE seller_id = ?
+        ORDER BY created_at DESC, id DESC
+      `);
+
+      const rows = stmt.all(sellerId) as unknown as Array<{
+        id: number;
+        seller_id: number;
+        payout_account_id: number;
+        account_type: string;
+        provider_name: string;
+        account_number: string;
+        account_holder_name: string;
+        amount: number;
+        fee: number;
+        net_amount: number;
+        status: WithdrawalStatus;
+        notes: string | null;
+        admin_notes: string | null;
+        rejection_reason: string | null;
+        reviewed_at: string | null;
+        created_at: string;
+        updated_at: string;
+      }>;
+
+      const data: SellerWithdrawalItem[] = rows.map((r) => ({
+        id: r.id,
+        sellerId: r.seller_id,
+        payoutAccountId: r.payout_account_id,
+        accountType: r.account_type,
+        providerName: r.provider_name,
+        accountNumber: r.account_number,
+        accountHolderName: r.account_holder_name,
+        amount: r.amount,
+        fee: r.fee,
+        netAmount: r.net_amount,
+        status: r.status,
+        notes: r.notes,
+        adminNotes: r.admin_notes,
+        rejectionReason: r.rejection_reason,
+        reviewedAt: r.reviewed_at,
+        createdAt: r.created_at,
+        updatedAt: r.updated_at,
+      }));
+
+      res.status(200).json({
+        success: true,
+        message: "Riwayat penarikan dana berhasil diambil.",
+        data,
+      });
+    } catch (error) {
+      console.error("[SellerController.getWithdrawals] Error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Gagal mengambil riwayat penarikan dana.",
+      });
+    }
+  }
+
+  /**
+   * Mengajukan penarikan dana (Withdrawal / WD) ke akun bank atau e-wallet tujuan
+   * POST /api/seller/withdrawals
+   */
+  async requestWithdrawal(req: Request, res: Response): Promise<void> {
+    try {
+      const sellerId = req.user?.id;
+      if (!sellerId) {
+        res.status(401).json({
+          success: false,
+          message: "Tidak terautentikasi.",
+        });
+        return;
+      }
+
+      // 1. Cek apakah penjual sudah memiliki akun rekening / wallet yang tersimpan
+      const countStmt = db.prepare(`
+        SELECT COUNT(*) as total FROM seller_payout_accounts WHERE seller_id = ?
+      `);
+      const countRes = countStmt.get(sellerId) as unknown as { total: number };
+      if (!countRes || countRes.total === 0) {
+        res.status(400).json({
+          success: false,
+          message:
+            "Anda belum memiliki akun bank atau dompet digital yang tersimpan. Silakan tambahkan akun penarikan terlebih dahulu untuk menarik saldo.",
+          needAccount: true,
+        });
+        return;
+      }
+
+      const { payoutAccountId, amount, notes } = req.body;
+
+      // 2. Validasi Akun Tujuan Penarikan
+      const parsedAccountId = Number(payoutAccountId);
+      if (!parsedAccountId || isNaN(parsedAccountId)) {
+        res.status(400).json({
+          success: false,
+          message: "Silakan pilih akun rekening atau dompet digital tujuan penarikan.",
+        });
+        return;
+      }
+
+      const findAccountStmt = db.prepare(`
+        SELECT id, account_type, provider_name, account_number, account_holder_name
+        FROM seller_payout_accounts
+        WHERE id = ? AND seller_id = ?
+      `);
+      const targetAccount = findAccountStmt.get(parsedAccountId, sellerId) as unknown as {
+        id: number;
+        account_type: string;
+        provider_name: string;
+        account_number: string;
+        account_holder_name: string;
+      } | undefined;
+
+      if (!targetAccount) {
+        res.status(404).json({
+          success: false,
+          message: "Akun penarikan tujuan tidak ditemukan dalam daftar akun tersimpan Anda.",
+        });
+        return;
+      }
+
+      // 3. Validasi Nominal Penarikan
+      const parsedAmount = Number(amount);
+      if (isNaN(parsedAmount) || parsedAmount <= 0) {
+        res.status(400).json({
+          success: false,
+          message: "Nominal penarikan harus berupa angka positif.",
+        });
+        return;
+      }
+
+      const MIN_WITHDRAWAL = 10000;
+      if (parsedAmount < MIN_WITHDRAWAL) {
+        res.status(400).json({
+          success: false,
+          message: `Minimal penarikan saldo adalah Rp ${MIN_WITHDRAWAL.toLocaleString("id-ID")}.`,
+        });
+        return;
+      }
+
+      // 4. Cek Saldo Toko Terkini
+      const userStmt = db.prepare(`
+        SELECT id, name, store_balance FROM users WHERE id = ? AND role = 'penjual'
+      `);
+      const seller = userStmt.get(sellerId) as unknown as {
+        id: number;
+        name: string;
+        store_balance: number | null;
+      } | undefined;
+
+      if (!seller) {
+        res.status(404).json({
+          success: false,
+          message: "Data akun penjual tidak ditemukan.",
+        });
+        return;
+      }
+
+      const currentBalance = Number(seller.store_balance || 0);
+      if (parsedAmount > currentBalance) {
+        const formattedCurrent = new Intl.NumberFormat("id-ID", {
+          style: "currency",
+          currency: "IDR",
+          maximumFractionDigits: 0,
+        }).format(currentBalance);
+
+        res.status(400).json({
+          success: false,
+          message: `Saldo toko Anda (${formattedCurrent}) tidak mencukupi untuk melakukan penarikan sebesar Rp ${parsedAmount.toLocaleString("id-ID")}.`,
+        });
+        return;
+      }
+
+      // 5. Eksekusi Pengurangan Saldo & Pencatatan Transaksi secara Atomic
+      const fee = 0; // Bebas biaya admin platform
+      const netAmount = parsedAmount - fee;
+      const balanceAfter = currentBalance - parsedAmount;
+      const cleanNotes = notes ? String(notes).trim() : null;
+
+      const updateBalanceStmt = db.prepare(`
+        UPDATE users
+        SET store_balance = store_balance - ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `);
+
+      const insertWithdrawalStmt = db.prepare(`
+        INSERT INTO seller_withdrawals (
+          seller_id, payout_account_id, account_type, provider_name, account_number, account_holder_name,
+          amount, fee, net_amount, status, notes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+      `);
+
+      const mutationDesc = `Pengajuan penarikan saldo (WD) ke ${targetAccount.provider_name} (${targetAccount.account_number}) a.n ${targetAccount.account_holder_name} - Menunggu persetujuan admin${
+        cleanNotes ? ` - Catatan: ${cleanNotes}` : ""
+      }`;
+
+      const insertMutationStmt = db.prepare(`
+        INSERT INTO balance_mutations (
+          user_id, role, type, amount, balance_before, balance_after, description, admin_id
+        ) VALUES (?, 'penjual', 'withdrawal', ?, ?, ?, ?, NULL)
+      `);
+
+      updateBalanceStmt.run(parsedAmount, sellerId);
+      const wdResult = insertWithdrawalStmt.run(
+        sellerId,
+        targetAccount.id,
+        targetAccount.account_type,
+        targetAccount.provider_name,
+        targetAccount.account_number,
+        targetAccount.account_holder_name,
+        parsedAmount,
+        fee,
+        netAmount,
+        cleanNotes
+      );
+      insertMutationStmt.run(sellerId, parsedAmount, currentBalance, balanceAfter, mutationDesc);
+
+      const formattedAmount = new Intl.NumberFormat("id-ID", {
+        style: "currency",
+        currency: "IDR",
+        maximumFractionDigits: 0,
+      }).format(parsedAmount);
+
+      const formattedNewBalance = new Intl.NumberFormat("id-ID", {
+        style: "currency",
+        currency: "IDR",
+        maximumFractionDigits: 0,
+      }).format(balanceAfter);
+
+      const newWithdrawal: SellerWithdrawalItem = {
+        id: Number(wdResult.lastInsertRowid),
+        sellerId,
+        payoutAccountId: targetAccount.id,
+        accountType: targetAccount.account_type,
+        providerName: targetAccount.provider_name,
+        accountNumber: targetAccount.account_number,
+        accountHolderName: targetAccount.account_holder_name,
+        amount: parsedAmount,
+        fee,
+        netAmount,
+        status: "pending",
+        notes: cleanNotes,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      res.status(201).json({
+        success: true,
+        message: `Pengajuan penarikan dana sebesar ${formattedAmount} ke ${targetAccount.provider_name} (${targetAccount.account_number}) berhasil dikirim dan sedang menunggu persetujuan admin. Sisa saldo toko: ${formattedNewBalance}.`,
+        data: newWithdrawal,
+        newBalance: balanceAfter,
+      });
+    } catch (error) {
+      console.error("[SellerController.requestWithdrawal] Error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Gagal memproses pengajuan penarikan dana.",
       });
     }
   }

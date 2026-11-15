@@ -165,6 +165,65 @@ export interface AdminUpdateVerificationDecisionResponse {
   stats?: AdminVerificationStats;
 }
 
+export interface AdminSellerWithdrawalItem {
+  id: number;
+  sellerId: number;
+  sellerName: string;
+  sellerUsername: string;
+  sellerEmail: string;
+  sellerStoreBalance: number;
+  sellerVerificationStatus: string;
+  payoutAccountId: number;
+  accountType: string;
+  providerName: string;
+  accountNumber: string;
+  accountHolderName: string;
+  amount: number;
+  fee: number;
+  netAmount: number;
+  status: "pending" | "processing" | "completed" | "rejected";
+  notes?: string | null;
+  adminNotes?: string | null;
+  rejectionReason?: string | null;
+  reviewedBy?: number | null;
+  reviewerName?: string | null;
+  reviewedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminWithdrawalStats {
+  totalCount: number;
+  pendingCount: number;
+  completedCount: number;
+  rejectedCount: number;
+  totalCompletedAmount: number;
+  totalPendingAmount: number;
+}
+
+export interface AdminGetWithdrawalsResponse {
+  success: boolean;
+  message?: string;
+  data: AdminSellerWithdrawalItem[];
+  stats: AdminWithdrawalStats;
+}
+
+export interface AdminWithdrawalDecisionPayload {
+  decision: "approve" | "reject";
+  adminNotes?: string;
+  rejectionReason?: string;
+}
+
+export interface AdminWithdrawalDecisionResponse {
+  success: boolean;
+  message: string;
+  status?: string;
+  adminNotes?: string;
+  rejectionReason?: string;
+  refundedAmount?: number;
+  newSellerBalance?: number;
+}
+
 export const adminService = {
   /**
    * Mengambil seluruh data pengguna dari endpoint GET /api/admin/users
@@ -765,6 +824,100 @@ export const adminService = {
         success: false,
         message: "Gagal terhubung ke backend server.",
         data: [],
+      };
+    }
+  },
+
+  /**
+   * Mengambil daftar seluruh penarikan dana penjual (WD)
+   * GET /api/admin/sellers/withdrawals
+   */
+  async getSellerWithdrawals(
+    token: string,
+    params?: {
+      search?: string;
+      status?: string;
+      sort?: string;
+    }
+  ): Promise<AdminGetWithdrawalsResponse> {
+    try {
+      const queryParams = new URLSearchParams();
+      if (params?.search) queryParams.append("search", params.search);
+      if (params?.status) queryParams.append("status", params.status);
+      if (params?.sort) queryParams.append("sort", params.sort);
+
+      const qs = queryParams.toString();
+      const url = `${API_URL}/admin/sellers/withdrawals${qs ? `?${qs}` : ""}`;
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        return {
+          success: false,
+          message: result.message || "Gagal mengambil data penarikan saldo penjual.",
+          data: [],
+          stats: {
+            totalCount: 0,
+            pendingCount: 0,
+            completedCount: 0,
+            rejectedCount: 0,
+            totalCompletedAmount: 0,
+            totalPendingAmount: 0,
+          },
+        };
+      }
+
+      return result;
+    } catch (error) {
+      console.error("[adminService.getSellerWithdrawals] Error:", error);
+      return {
+        success: false,
+        message: "Gagal terhubung ke backend server.",
+        data: [],
+        stats: {
+          totalCount: 0,
+          pendingCount: 0,
+          completedCount: 0,
+          rejectedCount: 0,
+          totalCompletedAmount: 0,
+          totalPendingAmount: 0,
+        },
+      };
+    }
+  },
+
+  /**
+   * Menyetujui (ACC) atau Menolak transaksi penarikan saldo penjual
+   * PATCH /api/admin/sellers/withdrawals/:id/decision
+   */
+  async updateWithdrawalDecision(
+    token: string,
+    withdrawalId: number,
+    payload: AdminWithdrawalDecisionPayload
+  ): Promise<AdminWithdrawalDecisionResponse> {
+    try {
+      const response = await fetch(`${API_URL}/admin/sellers/withdrawals/${withdrawalId}/decision`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error("[adminService.updateWithdrawalDecision] Error:", error);
+      return {
+        success: false,
+        message: "Gagal terhubung ke server saat memproses keputusan transaksi.",
       };
     }
   },

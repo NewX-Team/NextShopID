@@ -118,6 +118,7 @@ export default function AdminPage() {
   const [activeMenu, setActiveMenu] = useState<AdminMenuKey>("pengguna");
   const [isTogglingServer, setIsTogglingServer] = useState<boolean>(false);
   const [pendingVerificationsCount, setPendingVerificationsCount] = useState<number>(0);
+  const [pendingWithdrawalsCount, setPendingWithdrawalsCount] = useState<number>(0);
 
   // Ambil jumlah pending verifikasi penjual realtime
   const fetchPendingVerificationsCount = useCallback(async () => {
@@ -132,11 +133,25 @@ export default function AdminPage() {
     }
   }, [token]);
 
+  // Ambil jumlah pending penarikan saldo penjual realtime
+  const fetchPendingWithdrawalsCount = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await adminService.getSellerWithdrawals(token, { status: "pending" });
+      if (res.success && res.stats) {
+        setPendingWithdrawalsCount(res.stats.pendingCount);
+      }
+    } catch (err) {
+      console.error("[AdminPage] Gagal memuat statistik pending penarikan:", err);
+    }
+  }, [token]);
+
   useEffect(() => {
     if (isAuthenticated && user?.role === "admin") {
       fetchPendingVerificationsCount();
+      fetchPendingWithdrawalsCount();
     }
-  }, [isAuthenticated, user?.role, fetchPendingVerificationsCount]);
+  }, [isAuthenticated, user?.role, fetchPendingVerificationsCount, fetchPendingWithdrawalsCount]);
 
   // Handler toggle server ON / OFF yang tersinkronisasi ke backend
   const handleToggleServer = async () => {
@@ -194,6 +209,7 @@ export default function AdminPage() {
         onLogout={handleLogout}
         isServerActive={isServerActive}
         pendingVerificationsCount={pendingVerificationsCount}
+        pendingWithdrawalsCount={pendingWithdrawalsCount}
       />
 
       {/* 2. Konten Utama di Sisi Kanan */}
@@ -289,7 +305,11 @@ export default function AdminPage() {
                 }}
               />
             ) : activeMenu === "saldo_penjual" ? (
-              <SellerBalanceManagementView />
+              <SellerBalanceManagementView
+                onPendingWdUpdate={(count) => {
+                  setPendingWithdrawalsCount(count);
+                }}
+              />
             ) : (
               <div className="py-12 flex flex-col items-center justify-center text-center">
                 {/* Kartu Hero Placeholder Menu */}

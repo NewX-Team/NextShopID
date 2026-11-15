@@ -151,7 +151,56 @@ export function initDatabase(): void {
     CREATE INDEX IF NOT EXISTS idx_seller_payout_accounts_seller ON seller_payout_accounts(seller_id);
   `);
 
-  // 4. Inisialisasi tabel token reset kata sandi
+  // 4. Inisialisasi tabel riwayat penarikan dana (Withdrawal) penjual
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS seller_withdrawals (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      seller_id INTEGER NOT NULL,
+      payout_account_id INTEGER NOT NULL,
+      account_type TEXT NOT NULL,
+      provider_name TEXT NOT NULL,
+      account_number TEXT NOT NULL,
+      account_holder_name TEXT NOT NULL,
+      amount REAL NOT NULL,
+      fee REAL NOT NULL DEFAULT 0,
+      net_amount REAL NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'processing', 'completed', 'rejected')),
+      notes TEXT DEFAULT NULL,
+      admin_notes TEXT DEFAULT NULL,
+      rejection_reason TEXT DEFAULT NULL,
+      reviewed_by INTEGER DEFAULT NULL,
+      reviewed_at DATETIME DEFAULT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (seller_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (payout_account_id) REFERENCES seller_payout_accounts(id) ON DELETE RESTRICT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_seller_withdrawals_seller ON seller_withdrawals(seller_id);
+    CREATE INDEX IF NOT EXISTS idx_seller_withdrawals_status ON seller_withdrawals(status);
+    CREATE INDEX IF NOT EXISTS idx_seller_withdrawals_created ON seller_withdrawals(created_at);
+  `);
+
+  // Migrasi kolom tambahan tabel seller_withdrawals
+  const wdColumns = db.prepare("PRAGMA table_info(seller_withdrawals);").all() as Array<{ name: string }>;
+  if (!wdColumns.some((c) => c.name === "admin_notes")) {
+    db.exec("ALTER TABLE seller_withdrawals ADD COLUMN admin_notes TEXT DEFAULT NULL;");
+    console.log("[Database] Kolom 'admin_notes' berhasil ditambahkan ke tabel seller_withdrawals.");
+  }
+  if (!wdColumns.some((c) => c.name === "rejection_reason")) {
+    db.exec("ALTER TABLE seller_withdrawals ADD COLUMN rejection_reason TEXT DEFAULT NULL;");
+    console.log("[Database] Kolom 'rejection_reason' berhasil ditambahkan ke tabel seller_withdrawals.");
+  }
+  if (!wdColumns.some((c) => c.name === "reviewed_by")) {
+    db.exec("ALTER TABLE seller_withdrawals ADD COLUMN reviewed_by INTEGER DEFAULT NULL;");
+    console.log("[Database] Kolom 'reviewed_by' berhasil ditambahkan ke tabel seller_withdrawals.");
+  }
+  if (!wdColumns.some((c) => c.name === "reviewed_at")) {
+    db.exec("ALTER TABLE seller_withdrawals ADD COLUMN reviewed_at DATETIME DEFAULT NULL;");
+    console.log("[Database] Kolom 'reviewed_at' berhasil ditambahkan ke tabel seller_withdrawals.");
+  }
+
+  // 5. Inisialisasi tabel token reset kata sandi
   db.exec(`
     CREATE TABLE IF NOT EXISTS password_resets (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

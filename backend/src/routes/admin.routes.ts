@@ -27,6 +27,10 @@ router.get("/sellers/balances", adminController.getSellerBalances.bind(adminCont
 router.post("/sellers/:id/balance/topup", adminController.topupSellerBalance.bind(adminController));
 router.get("/sellers/:id/balance/history", adminController.getSellerBalanceHistory.bind(adminController));
 
+// Finansial - Persetujuan Penarikan Saldo Penjual (WD)
+router.get("/sellers/withdrawals", adminController.getSellerWithdrawals.bind(adminController));
+router.patch("/sellers/withdrawals/:id/decision", adminController.updateWithdrawalDecision.bind(adminController));
+
 // Kontrol On/Off Server
 router.get("/server-status", adminController.getServerStatus.bind(adminController));
 router.patch("/server-status", adminController.updateServerStatus.bind(adminController));

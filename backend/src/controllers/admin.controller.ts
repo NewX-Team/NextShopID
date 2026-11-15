@@ -1422,6 +1422,316 @@ export class AdminController {
       });
     }
   }
+
+  /**
+   * Mengambil daftar seluruh pengajuan penarikan saldo penjual (WD) beserta statistik realtime
+   * GET /api/admin/sellers/withdrawals
+   */
+  async getSellerWithdrawals(req: Request, res: Response): Promise<void> {
+    try {
+      const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
+      const statusFilter = typeof req.query.status === "string" ? req.query.status.trim() : "all";
+      const sort = typeof req.query.sort === "string" ? req.query.sort.trim() : "newest";
+
+      // 1. Hitung statistik keseluruhan penarikan realtime
+      const statsStmt = db.prepare(`
+        SELECT 
+          COUNT(*) as totalCount,
+          SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pendingCount,
+          SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completedCount,
+          SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as rejectedCount,
+          COALESCE(SUM(CASE WHEN status = 'completed' THEN amount ELSE 0 END), 0) as totalCompletedAmount,
+          COALESCE(SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END), 0) as totalPendingAmount
+        FROM seller_withdrawals
+      `);
+
+      const stats = statsStmt.get() as unknown as {
+        totalCount: number;
+        pendingCount: number;
+        completedCount: number;
+        rejectedCount: number;
+        totalCompletedAmount: number;
+        totalPendingAmount: number;
+      };
+
+      // 2. Susun kondisi WHERE
+      const conditions: string[] = ["1=1"];
+      const params: (string | number)[] = [];
+
+      if (search) {
+        conditions.push(`(
+          u.name LIKE ? OR u.username LIKE ? OR u.email LIKE ? OR 
+          w.provider_name LIKE ? OR w.account_number LIKE ? OR w.account_holder_name LIKE ?
+        )`);
+        const pattern = `%${search}%`;
+        params.push(pattern, pattern, pattern, pattern, pattern, pattern);
+      }
+
+      if (statusFilter && statusFilter !== "all") {
+        if (["pending", "completed", "rejected"].includes(statusFilter)) {
+          conditions.push("w.status = ?");
+          params.push(statusFilter);
+        }
+      }
+
+      const whereClause = `WHERE ${conditions.join(" AND ")}`;
+
+      let orderBy = "ORDER BY CASE WHEN w.status = 'pending' THEN 0 ELSE 1 END, w.created_at DESC, w.id DESC";
+      if (sort === "oldest") {
+        orderBy = "ORDER BY w.created_at ASC, w.id ASC";
+      } else if (sort === "highest_amount") {
+        orderBy = "ORDER BY w.amount DESC, w.id DESC";
+      } else if (sort === "lowest_amount") {
+        orderBy = "ORDER BY w.amount ASC, w.id DESC";
+      }
+
+      const query = `
+        SELECT 
+          w.id, w.seller_id, w.payout_account_id, w.account_type, w.provider_name,
+          w.account_number, w.account_holder_name, w.amount, w.fee, w.net_amount,
+          w.status, w.notes, w.admin_notes, w.rejection_reason, w.reviewed_by,
+          w.reviewed_at, w.created_at, w.updated_at,
+          u.name as seller_name, u.username as seller_username, u.email as seller_email,
+          u.store_balance as seller_store_balance, u.verification_status as seller_verification_status,
+          a.name as reviewer_name
+        FROM seller_withdrawals w
+        JOIN users u ON w.seller_id = u.id
+        LEFT JOIN users a ON w.reviewed_by = a.id
+        ${whereClause}
+        ${orderBy}
+      `;
+
+      const stmt = db.prepare(query);
+      const rows = stmt.all(...params) as unknown as Array<{
+        id: number;
+        seller_id: number;
+        payout_account_id: number;
+        account_type: string;
+        provider_name: string;
+        account_number: string;
+        account_holder_name: string;
+        amount: number;
+        fee: number;
+        net_amount: number;
+        status: string;
+        notes: string | null;
+        admin_notes: string | null;
+        rejection_reason: string | null;
+        reviewed_by: number | null;
+        reviewed_at: string | null;
+        created_at: string;
+        updated_at: string;
+        seller_name: string;
+        seller_username: string;
+        seller_email: string;
+        seller_store_balance: number;
+        seller_verification_status: string | null;
+        reviewer_name: string | null;
+      }>;
+
+      const data = rows.map((r) => ({
+        id: r.id,
+        sellerId: r.seller_id,
+        sellerName: r.seller_name,
+        sellerUsername: r.seller_username,
+        sellerEmail: r.seller_email,
+        sellerStoreBalance: Number(r.seller_store_balance || 0),
+        sellerVerificationStatus: r.seller_verification_status || "unverified",
+        payoutAccountId: r.payout_account_id,
+        accountType: r.account_type,
+        providerName: r.provider_name,
+        accountNumber: r.account_number,
+        accountHolderName: r.account_holder_name,
+        amount: r.amount,
+        fee: r.fee,
+        netAmount: r.net_amount,
+        status: r.status,
+        notes: r.notes,
+        adminNotes: r.admin_notes,
+        rejectionReason: r.rejection_reason,
+        reviewedBy: r.reviewed_by,
+        reviewerName: r.reviewer_name,
+        reviewedAt: r.reviewed_at,
+        createdAt: r.created_at,
+        updatedAt: r.updated_at,
+      }));
+
+      res.json({
+        success: true,
+        message: "Data pengajuan penarikan dana penjual berhasil diambil.",
+        data,
+        stats: {
+          totalCount: stats.totalCount || 0,
+          pendingCount: stats.pendingCount || 0,
+          completedCount: stats.completedCount || 0,
+          rejectedCount: stats.rejectedCount || 0,
+          totalCompletedAmount: Number(stats.totalCompletedAmount || 0),
+          totalPendingAmount: Number(stats.totalPendingAmount || 0),
+        },
+      });
+    } catch (error) {
+      console.error("[AdminController.getSellerWithdrawals] Error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Gagal mengambil data penarikan saldo penjual.",
+      });
+    }
+  }
+
+  /**
+   * Menyetujui (ACC) atau Menolak pengajuan penarikan saldo penjual
+   * PATCH /api/admin/sellers/withdrawals/:id/decision
+   */
+  async updateWithdrawalDecision(req: Request, res: Response): Promise<void> {
+    try {
+      const withdrawalId = Number(req.params.id);
+      const adminId = req.user?.id || 1;
+      const { decision, adminNotes, rejectionReason } = req.body;
+
+      if (!withdrawalId || isNaN(withdrawalId)) {
+        res.status(400).json({
+          success: false,
+          message: "ID penarikan tidak valid.",
+        });
+        return;
+      }
+
+      if (!decision || !["approve", "reject"].includes(decision)) {
+        res.status(400).json({
+          success: false,
+          message: "Keputusan harus berupa 'approve' (ACC) atau 'reject' (Tolak).",
+        });
+        return;
+      }
+
+      // 1. Ambil data pengajuan penarikan saat ini
+      const findStmt = db.prepare(`
+        SELECT w.*, u.name as seller_name, u.store_balance
+        FROM seller_withdrawals w
+        JOIN users u ON w.seller_id = u.id
+        WHERE w.id = ?
+      `);
+      const withdrawal = findStmt.get(withdrawalId) as unknown as any;
+
+      if (!withdrawal) {
+        res.status(404).json({
+          success: false,
+          message: "Data pengajuan penarikan tidak ditemukan.",
+        });
+        return;
+      }
+
+      if (withdrawal.status !== "pending") {
+        res.status(400).json({
+          success: false,
+          message: `Transaksi penarikan ini sudah ${
+            withdrawal.status === "completed" ? "disetujui (ACC)" : "ditolak"
+          } sebelumnya dan tidak dapat diproses ulang.`,
+        });
+        return;
+      }
+
+      const formattedAmount = new Intl.NumberFormat("id-ID", {
+        style: "currency",
+        currency: "IDR",
+        maximumFractionDigits: 0,
+      }).format(withdrawal.amount);
+
+      if (decision === "approve") {
+        // ACC / Setujui
+        const defaultApproveNote =
+          "Transaksi penarikan saldo telah berhasil diproses dan ditransfer. Silakan periksa mutasi rekening/dompet digital Anda.";
+        const finalAdminNote = adminNotes ? String(adminNotes).trim() : defaultApproveNote;
+
+        const updateStmt = db.prepare(`
+          UPDATE seller_withdrawals
+          SET status = 'completed',
+              admin_notes = ?,
+              rejection_reason = NULL,
+              reviewed_by = ?,
+              reviewed_at = CURRENT_TIMESTAMP,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `);
+        updateStmt.run(finalAdminNote, adminId, withdrawalId);
+
+        res.json({
+          success: true,
+          message: `Transaksi penarikan saldo sebesar ${formattedAmount} untuk toko '${withdrawal.seller_name}' berhasil disetujui (ACC).`,
+          status: "completed",
+          adminNotes: finalAdminNote,
+        });
+      } else {
+        // Tolak / Reject
+        const cleanReason = rejectionReason ? String(rejectionReason).trim() : "";
+        if (!cleanReason || cleanReason.length < 3) {
+          res.status(400).json({
+            success: false,
+            message:
+              "Alasan penolakan penarikan wajib diisi minimal 3 karakter (misal: nama dan nomor rekening tidak sesuai).",
+          });
+          return;
+        }
+
+        const finalAdminNote = adminNotes
+          ? String(adminNotes).trim()
+          : `Penarikan ditolak admin: ${cleanReason}`;
+
+        // Atomic transaction: update status, refund seller balance, dan catat mutasi pengembalian dana
+        const currentBalance = Number(withdrawal.store_balance || 0);
+        const balanceAfter = currentBalance + Number(withdrawal.amount);
+
+        const updateWdStmt = db.prepare(`
+          UPDATE seller_withdrawals
+          SET status = 'rejected',
+              rejection_reason = ?,
+              admin_notes = ?,
+              reviewed_by = ?,
+              reviewed_at = CURRENT_TIMESTAMP,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `);
+
+        const refundBalanceStmt = db.prepare(`
+          UPDATE users
+          SET store_balance = store_balance + ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `);
+
+        const insertRefundMutationStmt = db.prepare(`
+          INSERT INTO balance_mutations (
+            user_id, role, type, amount, balance_before, balance_after, description, admin_id
+          ) VALUES (?, 'penjual', 'refund', ?, ?, ?, ?, ?)
+        `);
+
+        updateWdStmt.run(cleanReason, finalAdminNote, adminId, withdrawalId);
+        refundBalanceStmt.run(withdrawal.amount, withdrawal.seller_id);
+        insertRefundMutationStmt.run(
+          withdrawal.seller_id,
+          withdrawal.amount,
+          currentBalance,
+          balanceAfter,
+          `Pengembalian dana (refund) akibat penarikan saldo ditolak admin: ${cleanReason}`,
+          adminId
+        );
+
+        res.json({
+          success: true,
+          message: `Transaksi penarikan saldo sebesar ${formattedAmount} untuk toko '${withdrawal.seller_name}' berhasil ditolak. Saldo sebesar ${formattedAmount} telah dikembalikan secara realtime ke saldo toko penjual.`,
+          status: "rejected",
+          rejectionReason: cleanReason,
+          refundedAmount: withdrawal.amount,
+          newSellerBalance: balanceAfter,
+        });
+      }
+    } catch (error) {
+      console.error("[AdminController.updateWithdrawalDecision] Error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Gagal memproses keputusan penarikan saldo.",
+      });
+    }
+  }
 }
 
 export const adminController = new AdminController();

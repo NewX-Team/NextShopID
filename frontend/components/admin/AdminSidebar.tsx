@@ -44,6 +44,7 @@ interface AdminSidebarProps {
   onLogout: () => void;
   isServerActive?: boolean;
   pendingVerificationsCount?: number;
+  pendingWithdrawalsCount?: number;
 }
 
 interface MenuItemDef {
@@ -65,6 +66,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   onLogout,
   isServerActive = true,
   pendingVerificationsCount = 0,
+  pendingWithdrawalsCount = 0,
 }) => {
   const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -129,6 +131,8 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
           key: "saldo_penjual",
           label: "Saldo Penjual",
           icon: WalletIcon,
+          badge: pendingWithdrawalsCount > 0 ? `${pendingWithdrawalsCount}` : undefined,
+          badgeColor: "amber",
         },
         {
           key: "saldo_pembeli",

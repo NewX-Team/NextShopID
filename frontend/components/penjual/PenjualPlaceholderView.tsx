@@ -29,6 +29,7 @@ interface PenjualPlaceholderViewProps {
   token?: string;
   onNavigateToMenu?: (menu: PenjualMenuKey) => void;
   onVerificationSubmitted?: (updatedProfile: SellerProfile) => void;
+  onBalanceUpdated?: (newBalance: number) => void;
 }
 
 export const PenjualPlaceholderView: React.FC<PenjualPlaceholderViewProps> = ({
@@ -37,6 +38,7 @@ export const PenjualPlaceholderView: React.FC<PenjualPlaceholderViewProps> = ({
   token,
   onNavigateToMenu,
   onVerificationSubmitted,
+  onBalanceUpdated,
 }) => {
   const stats = sellerProfile?.stats || {
     totalProducts: 0,
@@ -108,10 +110,12 @@ export const PenjualPlaceholderView: React.FC<PenjualPlaceholderViewProps> = ({
             <button
               type="button"
               onClick={() => onNavigateToMenu && onNavigateToMenu("tambah_produk")}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+              className="group inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:via-teal-500 hover:to-emerald-600 active:scale-[0.98] text-white font-semibold text-xs shadow-md shadow-emerald-950/20 hover:shadow-lg hover:shadow-emerald-500/25 border border-emerald-400/30 transition-all duration-200 cursor-pointer"
             >
-              <PlusIcon size={15} />
-              <span>Tambah Produk</span>
+              <span className="flex h-5 w-5 items-center justify-center rounded-lg bg-white/20 text-white group-hover:scale-110 transition-transform">
+                <PlusIcon size={12} className="stroke-[2.5]" />
+              </span>
+              <span className="tracking-wide">Tambah Produk</span>
             </button>
           </div>
         </div>
@@ -260,10 +264,12 @@ export const PenjualPlaceholderView: React.FC<PenjualPlaceholderViewProps> = ({
             <button
               type="button"
               onClick={() => onNavigateToMenu && onNavigateToMenu("tambah_produk")}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/20 transition-all cursor-pointer"
+              className="group inline-flex items-center gap-2.5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:via-indigo-500 hover:to-blue-600 active:scale-[0.98] text-white font-semibold text-xs shadow-md shadow-blue-950/20 hover:shadow-lg hover:shadow-blue-500/25 border border-blue-400/30 transition-all duration-200 cursor-pointer"
             >
-              <PlusIcon size={14} />
-              <span>+ Daftarkan Produk Pertama</span>
+              <span className="flex h-5 w-5 items-center justify-center rounded-lg bg-white/20 text-white group-hover:scale-110 transition-transform">
+                <PlusIcon size={12} className="stroke-[2.5]" />
+              </span>
+              <span className="tracking-wide">Daftarkan Produk Pertama</span>
             </button>
           </div>
         </div>
@@ -294,10 +300,12 @@ export const PenjualPlaceholderView: React.FC<PenjualPlaceholderViewProps> = ({
             <button
               type="button"
               onClick={() => onNavigateToMenu && onNavigateToMenu("tambah_produk")}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+              className="group inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:via-teal-500 hover:to-emerald-600 active:scale-[0.98] text-white font-semibold text-xs shadow-md shadow-emerald-950/20 hover:shadow-lg hover:shadow-emerald-500/25 border border-emerald-400/30 transition-all duration-200 cursor-pointer"
             >
-              <PlusIcon size={15} />
-              <span>Tambah Produk Baru</span>
+              <span className="flex h-5 w-5 items-center justify-center rounded-lg bg-white/20 text-white group-hover:scale-110 transition-transform">
+                <PlusIcon size={12} className="stroke-[2.5]" />
+              </span>
+              <span className="tracking-wide">Tambah Produk Baru</span>
             </button>
           </div>
         </div>
@@ -352,10 +360,12 @@ export const PenjualPlaceholderView: React.FC<PenjualPlaceholderViewProps> = ({
             <button
               type="button"
               onClick={() => onNavigateToMenu && onNavigateToMenu("tambah_produk")}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+              className="group inline-flex items-center gap-2.5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:via-teal-500 hover:to-emerald-600 active:scale-[0.98] text-white font-semibold text-xs shadow-md shadow-emerald-950/20 hover:shadow-lg hover:shadow-emerald-500/25 border border-emerald-400/30 transition-all duration-200 cursor-pointer"
             >
-              <PlusIcon size={14} />
-              <span>+ Tambah Produk Baru</span>
+              <span className="flex h-5 w-5 items-center justify-center rounded-lg bg-white/20 text-white group-hover:scale-110 transition-transform">
+                <PlusIcon size={12} className="stroke-[2.5]" />
+              </span>
+              <span className="tracking-wide">Tambah Produk Baru</span>
             </button>
           </div>
         </div>
@@ -627,6 +637,7 @@ export const PenjualPlaceholderView: React.FC<PenjualPlaceholderViewProps> = ({
       <PenjualPayoutAccountsView
         sellerProfile={sellerProfile}
         token={token}
+        onBalanceUpdated={onBalanceUpdated}
       />
     );
   }

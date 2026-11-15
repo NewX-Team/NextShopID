@@ -104,6 +104,48 @@ export interface DeletePayoutAccountResponse {
   message?: string;
 }
 
+export type WithdrawalStatus = "pending" | "processing" | "completed" | "rejected";
+
+export interface SellerWithdrawalItem {
+  id: number;
+  sellerId: number;
+  payoutAccountId: number;
+  accountType: string;
+  providerName: string;
+  accountNumber: string;
+  accountHolderName: string;
+  amount: number;
+  fee: number;
+  netAmount: number;
+  status: WithdrawalStatus;
+  notes: string | null;
+  adminNotes?: string | null;
+  rejectionReason?: string | null;
+  reviewedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GetWithdrawalsResponse {
+  success: boolean;
+  message?: string;
+  data: SellerWithdrawalItem[];
+}
+
+export interface RequestWithdrawalPayload {
+  payoutAccountId: number;
+  amount: number;
+  notes?: string;
+}
+
+export interface RequestWithdrawalResponse {
+  success: boolean;
+  message?: string;
+  needAccount?: boolean;
+  data?: SellerWithdrawalItem;
+  newBalance?: number;
+}
+
 export const sellerService = {
   /**
    * Mengambil data profil dan statistik realtime penjual: GET /api/seller/profile
@@ -316,6 +358,66 @@ export const sellerService = {
       return {
         success: false,
         message: "Gagal terhubung ke server saat menghapus akun penarikan.",
+      };
+    }
+  },
+
+  /**
+   * Mengambil riwayat transaksi penarikan saldo (Withdrawal / WD): GET /api/seller/withdrawals
+   */
+  async getWithdrawals(token: string): Promise<GetWithdrawalsResponse> {
+    try {
+      const response = await fetch(`${API_URL}/seller/withdrawals`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        return {
+          success: false,
+          message: result.message || "Gagal mengambil riwayat penarikan dana.",
+          data: [],
+        };
+      }
+
+      return result;
+    } catch (error) {
+      console.error("[sellerService.getWithdrawals] Error:", error);
+      return {
+        success: false,
+        message: "Gagal terhubung ke backend server.",
+        data: [],
+      };
+    }
+  },
+
+  /**
+   * Mengajukan penarikan saldo (Withdrawal / WD): POST /api/seller/withdrawals
+   */
+  async requestWithdrawal(
+    token: string,
+    payload: RequestWithdrawalPayload
+  ): Promise<RequestWithdrawalResponse> {
+    try {
+      const response = await fetch(`${API_URL}/seller/withdrawals`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error("[sellerService.requestWithdrawal] Error:", error);
+      return {
+        success: false,
+        message: "Gagal terhubung ke server saat memproses penarikan saldo.",
       };
     }
   },
