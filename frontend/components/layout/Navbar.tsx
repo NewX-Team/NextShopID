@@ -425,8 +425,26 @@ export const Navbar: React.FC<NavbarProps> = ({ cartItemCount = 0 }) => {
                         </Link>
                       )}
 
+                      {/* Shortcut Dashboard Khusus Pembeli */}
+                      {user?.role === "user" && (
+                        <Link
+                          href="/pembeli"
+                          onClick={() => setIsProfileDropdownOpen(false)}
+                          className="group flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-medium text-blue-700 dark:text-blue-300 hover:bg-blue-50/80 dark:hover:bg-blue-950/30 transition-colors"
+                          role="menuitem"
+                        >
+                          <span className="text-blue-600 dark:text-blue-400">
+                            <UserIcon size={16} />
+                          </span>
+                          <div className="flex-1">
+                            <span className="block leading-none font-semibold">Dashboard Pembeli</span>
+                            <span className="text-[10px] text-blue-600/80 dark:text-blue-400/80 font-normal">Panel akun & pesanan</span>
+                          </div>
+                        </Link>
+                      )}
+
                       <Link
-                        href="/profile"
+                        href="/pembeli/profile"
                         onClick={() => setIsProfileDropdownOpen(false)}
                         className="group flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-medium text-slate-700 dark:text-slate-300 transition-colors hover:bg-slate-100/80 dark:hover:bg-white/5 hover:text-slate-950 dark:hover:text-white"
                         role="menuitem"
@@ -441,7 +459,7 @@ export const Navbar: React.FC<NavbarProps> = ({ cartItemCount = 0 }) => {
                       </Link>
 
                       <Link
-                        href="/settings"
+                        href="/pembeli/settings"
                         onClick={() => setIsProfileDropdownOpen(false)}
                         className="group flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-medium text-slate-700 dark:text-slate-300 transition-colors hover:bg-slate-100/80 dark:hover:bg-white/5 hover:text-slate-950 dark:hover:text-white"
                         role="menuitem"
@@ -456,7 +474,7 @@ export const Navbar: React.FC<NavbarProps> = ({ cartItemCount = 0 }) => {
                       </Link>
 
                       <Link
-                        href="/orders"
+                        href="/pembeli/orders"
                         onClick={() => setIsProfileDropdownOpen(false)}
                         className="group flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-medium text-slate-700 dark:text-slate-300 transition-colors hover:bg-slate-100/80 dark:hover:bg-white/5 hover:text-slate-950 dark:hover:text-white"
                         role="menuitem"
@@ -597,8 +615,19 @@ export const Navbar: React.FC<NavbarProps> = ({ cartItemCount = 0 }) => {
                     </Link>
                   )}
 
+                  {user?.role === "user" && (
+                    <Link
+                      href="/pembeli"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 rounded-lg hover:bg-white/20 dark:hover:bg-white/5"
+                    >
+                      <UserIcon size={16} />
+                      <span>Dashboard Pembeli</span>
+                    </Link>
+                  )}
+
                   <Link
-                    href="/profile"
+                    href="/pembeli/profile"
                     onClick={() => setIsMobileMenuOpen(false)}
                     className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white rounded-lg hover:bg-white/20 dark:hover:bg-white/5"
                   >
@@ -606,7 +635,7 @@ export const Navbar: React.FC<NavbarProps> = ({ cartItemCount = 0 }) => {
                     <span>Profil Saya</span>
                   </Link>
                   <Link
-                    href="/settings"
+                    href="/pembeli/settings"
                     onClick={() => setIsMobileMenuOpen(false)}
                     className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white rounded-lg hover:bg-white/20 dark:hover:bg-white/5"
                   >
@@ -614,7 +643,7 @@ export const Navbar: React.FC<NavbarProps> = ({ cartItemCount = 0 }) => {
                     <span>Pengaturan</span>
                   </Link>
                   <Link
-                    href="/orders"
+                    href="/pembeli/orders"
                     onClick={() => setIsMobileMenuOpen(false)}
                     className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white rounded-lg hover:bg-white/20 dark:hover:bg-white/5"
                   >
