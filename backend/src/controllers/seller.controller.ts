@@ -3,6 +3,22 @@ import { db } from "../config/database";
 
 export type SellerVerificationStatus = "unverified" | "pending" | "verified" | "rejected";
 
+export type PayoutAccountType = "bank" | "wallet";
+export type PayoutMethod = "preset" | "manual";
+
+export interface SellerPayoutAccountItem {
+  id: number;
+  sellerId: number;
+  accountType: PayoutAccountType;
+  providerName: string;
+  accountNumber: string;
+  accountHolderName: string;
+  method: PayoutMethod;
+  isAgreed: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface SellerVerificationPayload {
   ownerName: string;
   idCardNumber: string;
@@ -369,6 +385,279 @@ export class SellerController {
       res.status(500).json({
         success: false,
         message: "Gagal memperbarui status operasional toko.",
+      });
+    }
+  }
+
+  /**
+   * Mengambil seluruh daftar akun bank & e-wallet penarikan dana penjual
+   * GET /api/seller/payout-accounts
+   */
+  async getPayoutAccounts(req: Request, res: Response): Promise<void> {
+    try {
+      const sellerId = req.user?.id;
+      if (!sellerId) {
+        res.status(401).json({
+          success: false,
+          message: "Tidak terautentikasi.",
+        });
+        return;
+      }
+
+      const stmt = db.prepare(`
+        SELECT id, seller_id, account_type, provider_name, account_number, account_holder_name,
+               method, is_agreed, created_at, updated_at
+        FROM seller_payout_accounts
+        WHERE seller_id = ?
+        ORDER BY created_at DESC, id DESC
+      `);
+
+      const rows = stmt.all(sellerId) as unknown as Array<{
+        id: number;
+        seller_id: number;
+        account_type: "bank" | "wallet";
+        provider_name: string;
+        account_number: string;
+        account_holder_name: string;
+        method: "preset" | "manual";
+        is_agreed: number;
+        created_at: string;
+        updated_at: string;
+      }>;
+
+      const data: SellerPayoutAccountItem[] = rows.map((r) => ({
+        id: r.id,
+        sellerId: r.seller_id,
+        accountType: r.account_type,
+        providerName: r.provider_name,
+        accountNumber: r.account_number,
+        accountHolderName: r.account_holder_name,
+        method: r.method,
+        isAgreed: r.is_agreed === 1,
+        createdAt: r.created_at,
+        updatedAt: r.updated_at,
+      }));
+
+      res.status(200).json({
+        success: true,
+        message: "Daftar akun penarikan dana berhasil diambil.",
+        data,
+      });
+    } catch (error) {
+      console.error("[SellerController.getPayoutAccounts] Error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Gagal mengambil daftar akun penarikan dana.",
+      });
+    }
+  }
+
+  /**
+   * Menyimpan akun bank atau e-wallet penarikan baru untuk penjual
+   * POST /api/seller/payout-accounts
+   */
+  async addPayoutAccount(req: Request, res: Response): Promise<void> {
+    try {
+      const sellerId = req.user?.id;
+      if (!sellerId) {
+        res.status(401).json({
+          success: false,
+          message: "Tidak terautentikasi.",
+        });
+        return;
+      }
+
+      const {
+        accountType,
+        providerName,
+        accountNumber,
+        accountHolderName,
+        method,
+        isAgreed,
+      } = req.body;
+
+      // 1. Validasi Jenis Akun
+      if (!accountType || !["bank", "wallet"].includes(accountType)) {
+        res.status(400).json({
+          success: false,
+          message: "Jenis akun harus berupa 'bank' atau 'wallet'.",
+        });
+        return;
+      }
+
+      // 2. Validasi Metode Penambahan
+      if (!method || !["preset", "manual"].includes(method)) {
+        res.status(400).json({
+          success: false,
+          message: "Metode penambahan harus berupa 'preset' atau 'manual'.",
+        });
+        return;
+      }
+
+      // 3. Validasi Nama Provider (Bank / Wallet)
+      const cleanProviderName = String(providerName || "").trim();
+      if (!cleanProviderName || cleanProviderName.length < 2) {
+        res.status(400).json({
+          success: false,
+          message:
+            accountType === "bank"
+              ? "Nama bank wajib dipilih atau diisi minimal 2 karakter."
+              : "Nama e-wallet wajib dipilih atau diisi minimal 2 karakter.",
+        });
+        return;
+      }
+
+      // 4. Validasi Nomor Rekening / Wallet
+      const rawNumber = String(accountNumber || "").replace(/[\s-]/g, "").trim();
+      if (!rawNumber || rawNumber.length < 5 || rawNumber.length > 35) {
+        res.status(400).json({
+          success: false,
+          message:
+            accountType === "bank"
+              ? "Nomor rekening harus terdiri dari 5-35 karakter numerik."
+              : "Nomor e-wallet / HP harus terdiri dari 5-35 digit nomor yang valid.",
+        });
+        return;
+      }
+
+      // 5. Validasi Nama Pemilik Akun
+      const cleanHolderName = String(accountHolderName || "").trim();
+      if (!cleanHolderName || cleanHolderName.length < 2) {
+        res.status(400).json({
+          success: false,
+          message: "Nama lengkap pemilik akun rekening/wallet minimal 2 karakter.",
+        });
+        return;
+      }
+
+      // 6. Validasi Pernyataan Keabsahan untuk Metode Manual
+      if (method === "manual" && !isAgreed) {
+        res.status(400).json({
+          success: false,
+          message:
+            "Anda wajib menyetujui pernyataan bahwa data rekening/wallet yang dimasukkan adalah sah dan benar milik Anda.",
+        });
+        return;
+      }
+
+      // 7. Cek Duplikasi Nomor pada Toko yang Sama
+      const checkStmt = db.prepare(`
+        SELECT id FROM seller_payout_accounts
+        WHERE seller_id = ? AND provider_name = ? AND account_number = ?
+      `);
+      const existing = checkStmt.get(sellerId, cleanProviderName, rawNumber);
+      if (existing) {
+        res.status(400).json({
+          success: false,
+          message: `Akun ${accountType === "bank" ? "rekening" : "e-wallet"} ${cleanProviderName} dengan nomor ${rawNumber} sudah tersimpan di akun Anda.`,
+        });
+        return;
+      }
+
+      // 8. Insert ke Database
+      const insertStmt = db.prepare(`
+        INSERT INTO seller_payout_accounts (
+          seller_id, account_type, provider_name, account_number, account_holder_name, method, is_agreed
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      const result = insertStmt.run(
+        sellerId,
+        accountType,
+        cleanProviderName,
+        rawNumber,
+        cleanHolderName,
+        method,
+        method === "manual" ? (isAgreed ? 1 : 0) : 1
+      );
+
+      const newAccountId = Number(result.lastInsertRowid);
+
+      const newAccount: SellerPayoutAccountItem = {
+        id: newAccountId,
+        sellerId,
+        accountType,
+        providerName: cleanProviderName,
+        accountNumber: rawNumber,
+        accountHolderName: cleanHolderName,
+        method,
+        isAgreed: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      res.status(201).json({
+        success: true,
+        message: `Akun ${accountType === "bank" ? "rekening bank" : "e-wallet"} ${cleanProviderName} berhasil disimpan untuk proses penarikan saldo.`,
+        data: newAccount,
+      });
+    } catch (error) {
+      console.error("[SellerController.addPayoutAccount] Error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Gagal menyimpan akun penarikan dana.",
+      });
+    }
+  }
+
+  /**
+   * Menghapus akun bank atau e-wallet penarikan penjual
+   * DELETE /api/seller/payout-accounts/:id
+   */
+  async deletePayoutAccount(req: Request, res: Response): Promise<void> {
+    try {
+      const sellerId = req.user?.id;
+      if (!sellerId) {
+        res.status(401).json({
+          success: false,
+          message: "Tidak terautentikasi.",
+        });
+        return;
+      }
+
+      const accountId = Number(req.params.id);
+      if (!accountId || isNaN(accountId)) {
+        res.status(400).json({
+          success: false,
+          message: "ID akun tidak valid.",
+        });
+        return;
+      }
+
+      const findStmt = db.prepare(`
+        SELECT id, provider_name, account_number, account_type
+        FROM seller_payout_accounts
+        WHERE id = ? AND seller_id = ?
+      `);
+      const target = findStmt.get(accountId, sellerId) as unknown as {
+        id: number;
+        provider_name: string;
+        account_number: string;
+        account_type: string;
+      } | undefined;
+
+      if (!target) {
+        res.status(404).json({
+          success: false,
+          message: "Akun penarikan tidak ditemukan atau bukan milik Anda.",
+        });
+        return;
+      }
+
+      const deleteStmt = db.prepare(`
+        DELETE FROM seller_payout_accounts WHERE id = ? AND seller_id = ?
+      `);
+      deleteStmt.run(accountId, sellerId);
+
+      res.status(200).json({
+        success: true,
+        message: `Akun ${target.account_type === "bank" ? "rekening" : "e-wallet"} ${target.provider_name} (${target.account_number}) berhasil dihapus.`,
+      });
+    } catch (error) {
+      console.error("[SellerController.deletePayoutAccount] Error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Gagal menghapus akun penarikan dana.",
       });
     }
   }

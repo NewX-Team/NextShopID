@@ -132,7 +132,26 @@ export function initDatabase(): void {
     CREATE INDEX IF NOT EXISTS idx_balance_mutations_created ON balance_mutations(created_at);
   `);
 
-  // 3. Inisialisasi tabel token reset kata sandi
+  // 3. Inisialisasi tabel rekening & dompet digital penarikan dana penjual (Seller Payout Accounts)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS seller_payout_accounts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      seller_id INTEGER NOT NULL,
+      account_type TEXT NOT NULL CHECK(account_type IN ('bank', 'wallet')),
+      provider_name TEXT NOT NULL,
+      account_number TEXT NOT NULL,
+      account_holder_name TEXT NOT NULL,
+      method TEXT NOT NULL CHECK(method IN ('preset', 'manual')),
+      is_agreed INTEGER NOT NULL DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (seller_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_seller_payout_accounts_seller ON seller_payout_accounts(seller_id);
+  `);
+
+  // 4. Inisialisasi tabel token reset kata sandi
   db.exec(`
     CREATE TABLE IF NOT EXISTS password_resets (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

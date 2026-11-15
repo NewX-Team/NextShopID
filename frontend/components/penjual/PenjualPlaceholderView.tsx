@@ -4,6 +4,7 @@ import React from "react";
 import { PenjualMenuKey } from "./PenjualSidebar";
 import { SellerProfile } from "@/services/seller.service";
 import { PenjualVerificationView } from "./PenjualVerificationView";
+import { PenjualPayoutAccountsView } from "./PenjualPayoutAccountsView";
 import {
   DashboardIcon,
   PackageIcon,
@@ -620,82 +621,13 @@ export const PenjualPlaceholderView: React.FC<PenjualPlaceholderViewProps> = ({
     );
   }
 
-  // 8. Keuangan & Saldo View
+  // 8. Keuangan, Saldo & Akun Penarikan (WD)
   if (activeMenu === "keuangan") {
     return (
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200/80 dark:border-white/10">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
-                Saldo & Keuangan Toko
-              </h1>
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                Settlement
-              </span>
-            </div>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Rekapitulasi pendapatan bersih dan mutasi penarikan dana ke rekening bank.
-            </p>
-          </div>
-        </div>
-
-        {/* Ringkasan Saldo Aktual */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="p-5 rounded-2xl bg-white dark:bg-[#0c1220] border border-slate-200/80 dark:border-white/10 shadow-xs">
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              Saldo Siap Ditarik
-            </span>
-            <p className="mt-2 text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 tracking-tight">
-              {formattedBalance}
-            </p>
-            <p className="mt-1 text-[11px] text-slate-400">
-              {sellerProfile && sellerProfile.balance > 0 ? "Bisa dicairkan ke bank" : "Belum ada saldo penghasilan"}
-            </p>
-          </div>
-
-          <div className="p-5 rounded-2xl bg-white dark:bg-[#0c1220] border border-slate-200/80 dark:border-white/10 shadow-xs">
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              Saldo Tertahan (Dalam Pengiriman)
-            </span>
-            <p className="mt-2 text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-              Rp 0
-            </p>
-            <p className="mt-1 text-[11px] text-slate-400">
-              Akan masuk saldo setelah pesanan selesai
-            </p>
-          </div>
-
-          <div className="p-5 rounded-2xl bg-white dark:bg-[#0c1220] border border-slate-200/80 dark:border-white/10 shadow-xs">
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              Rekening Bank Terdaftar
-            </span>
-            <p className="mt-2 text-sm font-bold text-slate-900 dark:text-white tracking-tight">
-              Belum Ditautkan
-            </p>
-            <p className="mt-1 text-[11px] text-slate-400">
-              Tambahkan nomor rekening untuk penarikan
-            </p>
-          </div>
-        </div>
-
-        {/* Kanvas Kosongan Mutasi */}
-        <div className="w-full rounded-3xl border border-slate-200/90 dark:border-white/10 bg-white dark:bg-[#0c1220] p-8 sm:p-14 shadow-sm text-center">
-          <div className="w-full max-w-2xl mx-auto rounded-2xl border-2 border-dashed border-slate-200 dark:border-white/10 p-8 sm:p-12 flex flex-col items-center justify-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 mb-4 shadow-xs">
-              <WalletIcon size={28} />
-            </div>
-
-            <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mb-2 tracking-tight">
-              Belum Ada Riwayat Mutasi Keuangan
-            </h3>
-
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-md leading-relaxed">
-              Catatan mutasi saldo masuk dari pesanan dan saldo keluar dari penarikan dana akan tercatat secara realtime di sini.
-            </p>
-          </div>
-        </div>
-      </div>
+      <PenjualPayoutAccountsView
+        sellerProfile={sellerProfile}
+        token={token}
+      />
     );
   }
 

@@ -62,6 +62,48 @@ export interface SellerVerificationResponse {
   rejectionReason?: string | null;
 }
 
+export type PayoutAccountType = "bank" | "wallet";
+export type PayoutMethod = "preset" | "manual";
+
+export interface SellerPayoutAccount {
+  id: number;
+  sellerId: number;
+  accountType: PayoutAccountType;
+  providerName: string;
+  accountNumber: string;
+  accountHolderName: string;
+  method: PayoutMethod;
+  isAgreed: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GetPayoutAccountsResponse {
+  success: boolean;
+  message?: string;
+  data: SellerPayoutAccount[];
+}
+
+export interface AddPayoutAccountPayload {
+  accountType: PayoutAccountType;
+  providerName: string;
+  accountNumber: string;
+  accountHolderName: string;
+  method: PayoutMethod;
+  isAgreed?: boolean;
+}
+
+export interface AddPayoutAccountResponse {
+  success: boolean;
+  message?: string;
+  data?: SellerPayoutAccount;
+}
+
+export interface DeletePayoutAccountResponse {
+  success: boolean;
+  message?: string;
+}
+
 export const sellerService = {
   /**
    * Mengambil data profil dan statistik realtime penjual: GET /api/seller/profile
@@ -188,6 +230,92 @@ export const sellerService = {
       return {
         success: false,
         message: "Gagal terhubung ke server backend penjual.",
+      };
+    }
+  },
+
+  /**
+   * Mengambil daftar akun rekening & e-wallet penarikan penjual: GET /api/seller/payout-accounts
+   */
+  async getPayoutAccounts(token: string): Promise<GetPayoutAccountsResponse> {
+    try {
+      const response = await fetch(`${API_URL}/seller/payout-accounts`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        return {
+          success: false,
+          message: result.message || "Gagal mengambil daftar akun penarikan.",
+          data: [],
+        };
+      }
+
+      return result;
+    } catch (error) {
+      console.error("[sellerService.getPayoutAccounts] Error:", error);
+      return {
+        success: false,
+        message: "Gagal terhubung ke server backend penjual.",
+        data: [],
+      };
+    }
+  },
+
+  /**
+   * Menambahkan akun rekening atau e-wallet penarikan baru: POST /api/seller/payout-accounts
+   */
+  async addPayoutAccount(
+    token: string,
+    payload: AddPayoutAccountPayload
+  ): Promise<AddPayoutAccountResponse> {
+    try {
+      const response = await fetch(`${API_URL}/seller/payout-accounts`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error("[sellerService.addPayoutAccount] Error:", error);
+      return {
+        success: false,
+        message: "Gagal terhubung ke server saat menyimpan akun penarikan.",
+      };
+    }
+  },
+
+  /**
+   * Menghapus akun penarikan penjual: DELETE /api/seller/payout-accounts/:id
+   */
+  async deletePayoutAccount(
+    token: string,
+    id: number
+  ): Promise<DeletePayoutAccountResponse> {
+    try {
+      const response = await fetch(`${API_URL}/seller/payout-accounts/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error("[sellerService.deletePayoutAccount] Error:", error);
+      return {
+        success: false,
+        message: "Gagal terhubung ke server saat menghapus akun penarikan.",
       };
     }
   },

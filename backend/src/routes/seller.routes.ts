@@ -17,4 +17,9 @@ router.post("/verification", sellerController.submitVerification.bind(sellerCont
 // Kontrol On/Off Operasional Toko (Buka/Tutup)
 router.patch("/store-status", sellerController.updateStoreStatus.bind(sellerController));
 
+// Rekening Bank & E-Wallet Penarikan Saldo (WD) Penjual
+router.get("/payout-accounts", sellerController.getPayoutAccounts.bind(sellerController));
+router.post("/payout-accounts", sellerController.addPayoutAccount.bind(sellerController));
+router.delete("/payout-accounts/:id", sellerController.deletePayoutAccount.bind(sellerController));
+
 export const sellerRoutes = router;
