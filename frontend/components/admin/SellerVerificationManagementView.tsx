@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
 import {
   adminService,
@@ -10,7 +10,6 @@ import {
 } from "@/services/admin.service";
 import {
   SearchIcon,
-  FilterIcon,
   RefreshIcon,
   CheckCircleIcon,
   ClockIcon,
@@ -21,10 +20,13 @@ import {
   FileTextIcon,
   EyeIcon,
   StoreIcon,
-  ExternalLinkIcon,
   CloseIcon,
   CheckIcon,
   AlertCircleIcon,
+  LockIcon,
+  ArrowRightIcon,
+  ChevronDownIcon,
+  ExternalLinkIcon,
 } from "@/components/ui/icons";
 
 interface SellerVerificationManagementViewProps {
@@ -43,6 +45,7 @@ export const SellerVerificationManagementView: React.FC<
     pendingCount: 0,
     verifiedCount: 0,
     rejectedCount: 0,
+    suspendedCount: 0,
     unverifiedCount: 0,
   });
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -64,6 +67,7 @@ export const SellerVerificationManagementView: React.FC<
   const [isDecisionModalOpen, setIsDecisionModalOpen] = useState<boolean>(false);
   const [decisionType, setDecisionType] = useState<VerificationDecision>("approve");
   const [rejectionReason, setRejectionReason] = useState<string>("");
+  const [durationHours, setDurationHours] = useState<number>(24);
   const [isSubmittingDecision, setIsSubmittingDecision] = useState<boolean>(false);
 
   // State Modal Preview Foto Dokumen
@@ -75,13 +79,40 @@ export const SellerVerificationManagementView: React.FC<
   // State reveal NIK
   const [revealedNiks, setRevealedNiks] = useState<Record<number, boolean>>({});
 
-  // Preset alasan penolakan umum untuk kemudahan admin
+  // Preset alasan penolakan berkas
   const PRESET_REJECTION_REASONS = [
     "Foto KTP buram / tidak terbaca dengan jelas",
     "Data NIK tidak cocok dengan nama lengkap pada kartu identitas",
     "Foto selfie memegang KTP tidak sesuai panduan (wajah / kartu terpotong)",
     "Dokumen identitas telah kedaluwarsa atau rusak",
     "Profil usaha dan deskripsi toko belum memenuhi standar kepatuhan platform",
+  ];
+
+  // Preset alasan pencabutan / penghentian fungsi Mall
+  const PRESET_REVOKE_REASONS = [
+    "kontrak telah berakhir silahkan perpanjang kontrak",
+    "toko melanggar pedoman komunitas dan standar kemitraan Mall",
+    "Sengketa kepemilikan merek / hak cipta barang belum terselesaikan",
+    "Penurunan kualitas layanan dan laporan komplain pembeli melebihi ambang batas",
+  ];
+
+  // Preset alasan penangguhan / suspend sementara
+  const PRESET_SUSPEND_REASONS = [
+    "kena laporan dan di suspend sementara",
+    "Terjadi sengketa transaksi pesanan pembeli dalam proses investigasi admin",
+    "Pelanggaran pedoman produk atau penipuan informasi etalase toko",
+    "Indikasi manipulasi ulasan atau pesanan fiktif toko",
+  ];
+
+  // Pilihan cepat durasi suspend dalam satuan jam
+  const QUICK_SUSPENSION_DURATIONS = [
+    { hours: 1, label: "1 Jam (Min)" },
+    { hours: 6, label: "6 Jam" },
+    { hours: 12, label: "12 Jam" },
+    { hours: 24, label: "24 Jam (1 Hari)" },
+    { hours: 48, label: "48 Jam (2 Hari)" },
+    { hours: 72, label: "72 Jam (3 Hari)" },
+    { hours: 168, label: "168 Jam (7 Hari)" },
   ];
 
   // Ambil data verifikasi dari API admin
@@ -128,7 +159,7 @@ export const SellerVerificationManagementView: React.FC<
     fetchVerifications();
   }, [fetchVerifications]);
 
-  // Handler Submit Keputusan (ACC / Tolak / Pending)
+  // Handler Submit Keputusan
   const handleSubmitDecision = async () => {
     if (!token || !selectedSeller) return;
 
@@ -140,6 +171,31 @@ export const SellerVerificationManagementView: React.FC<
       return;
     }
 
+    if (decisionType === "revoke" && !rejectionReason.trim()) {
+      setFeedbackMessage({
+        type: "error",
+        text: "Wajib menyertakan alasan penghentian/pencabutan status Mall (misal: kontrak telah berakhir, pelanggaran pedoman, dll).",
+      });
+      return;
+    }
+
+    if (decisionType === "suspend") {
+      if (!rejectionReason.trim()) {
+        setFeedbackMessage({
+          type: "error",
+          text: "Wajib menyertakan alasan suspend sementara toko Mall.",
+        });
+        return;
+      }
+      if (!durationHours || durationHours < 1) {
+        setFeedbackMessage({
+          type: "error",
+          text: "Durasi penalti suspend wajib diisi minimal 1 jam (angka bulat).",
+        });
+        return;
+      }
+    }
+
     setIsSubmittingDecision(true);
     setFeedbackMessage(null);
 
@@ -149,9 +205,10 @@ export const SellerVerificationManagementView: React.FC<
         selectedSeller.id,
         {
           decision: decisionType,
-          reason:
-            decisionType === "reject" || decisionType === "pending"
-              ? rejectionReason.trim()
+          reason: rejectionReason.trim(),
+          durationHours:
+            decisionType === "suspend"
+              ? Math.max(1, Math.round(durationHours))
               : undefined,
         }
       );
@@ -203,9 +260,25 @@ export const SellerVerificationManagementView: React.FC<
   ) => {
     setSelectedSeller(seller);
     setDecisionType(type);
-    setRejectionReason(
-      type === "reject" ? seller.verificationRejectionReason || "" : ""
-    );
+    if (type === "reject") {
+      setRejectionReason(seller.verificationRejectionReason || "");
+    } else if (type === "revoke") {
+      setRejectionReason(
+        seller.verificationRejectionReason ||
+          "kontrak telah berakhir silahkan perpanjang kontrak"
+      );
+    } else if (type === "suspend") {
+      setRejectionReason(
+        seller.mallSuspensionReason || "kena laporan dan di suspend sementara"
+      );
+      setDurationHours(
+        seller.mallSuspensionHours && seller.mallSuspensionHours >= 1
+          ? seller.mallSuspensionHours
+          : 24
+      );
+    } else {
+      setRejectionReason("");
+    }
     setIsDecisionModalOpen(true);
   };
 
@@ -243,62 +316,84 @@ export const SellerVerificationManagementView: React.FC<
   const getBusinessTypeLabel = (type?: string) => {
     switch (type) {
       case "umkm":
-        return "UMKM / Toko Fisik";
+        return "UMKM Fisik";
       case "company":
-        return "Badan Usaha (CV / PT)";
+        return "Badan Usaha (CV/PT)";
       case "brand_distributor":
-        return "Distributor Resmi Brand";
+        return "Distributor Brand";
       case "individual":
       default:
-        return "Perorangan / Individu";
+        return "Perorangan";
     }
+  };
+
+  // Format link WhatsApp internasional
+  const getWhatsAppLink = (phone?: string) => {
+    if (!phone) return null;
+    let clean = phone.replace(/\D/g, "");
+    if (clean.startsWith("0")) {
+      clean = "62" + clean.slice(1);
+    }
+    return `https://wa.me/${clean}`;
   };
 
   return (
     <div className="space-y-6">
-      {/* 1. Header Judul & Ringkasan Deskripsi */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-slate-200/80 dark:border-white/10">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="h-9 w-9 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center justify-center">
-              <UserCheckIcon size={20} />
-            </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-                Verifikasi & Kelayakan Penjual
-              </h1>
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-                Persetujuan pengajuan merchant resmi, audit identitas KYC, berikan lencana centang (ACC), atau tolak dengan alasan terperinci.
-              </p>
-            </div>
-          </div>
-        </div>
+      {/* ========================================================================= */}
+      {/* 1. HEADER EXECUTIVE VIEWPORT & REALTIME SYNC */}
+      {/* ========================================================================= */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0c1322] via-[#0f172a] to-[#0a192f] border border-blue-500/20 p-6 sm:p-7 shadow-xl text-white">
+        {/* Ambient Glowing Highlights */}
+        <div className="absolute -top-20 -right-20 w-80 h-80 bg-blue-500/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-20 left-1/3 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Tombol Refresh Realtime */}
-        <div className="flex items-center gap-2 self-start md:self-auto">
-          <button
-            type="button"
-            onClick={() => fetchVerifications(true)}
-            disabled={isRefreshing || isLoading}
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-[#111827] border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5 text-slate-700 dark:text-slate-200 shadow-2xs transition-colors cursor-pointer disabled:opacity-60"
-            title="Muat ulang data verifikasi realtime"
-          >
-            <RefreshIcon
-              size={14}
-              className={isRefreshing ? "animate-spin text-blue-500" : "text-slate-400"}
-            />
-            <span>{isRefreshing ? "Menyinkronkan..." : "Sinkronkan"}</span>
-          </button>
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-500/20 text-blue-300 border border-blue-400/30 backdrop-blur-md">
+                <ShieldIcon size={14} className="text-blue-400" />
+                <span>Otoritas Verifikasi Merchant</span>
+              </span>
+              {stats.pendingCount > 0 && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-amber-500 text-slate-950 animate-pulse shadow-sm shadow-amber-500/50">
+                  {stats.pendingCount} Butuh Audit
+                </span>
+              )}
+            </div>
+
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+              Verifikasi Toko & Kelayakan Mall
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-300/80 max-w-2xl leading-relaxed">
+              Pusat audit identitas KYC, penerbitan lisensi resmi Official Mall, pengaturan durasi suspend sanksi toko, dan perlindungan ekosistem transaksi NextShopID.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2.5 self-start md:self-auto shrink-0">
+            <button
+              type="button"
+              onClick={() => fetchVerifications(true)}
+              disabled={isRefreshing || isLoading}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/15 active:scale-95 border border-white/15 text-xs font-semibold text-white backdrop-blur-md transition-all cursor-pointer disabled:opacity-50 shadow-xs"
+              title="Perbarui data realtime dari database"
+            >
+              <RefreshIcon
+                size={14}
+                className={isRefreshing ? "animate-spin text-blue-400" : "text-slate-300"}
+              />
+              <span>{isRefreshing ? "Menyinkronkan..." : "Sinkronkan Data"}</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Notifikasi / Feedback Banner */}
+      {/* Feedback Toast Banner */}
       {feedbackMessage && (
         <div
-          className={`p-4 rounded-2xl border text-xs sm:text-sm flex items-start justify-between gap-3 transition-all duration-200 ${
+          className={`p-4 rounded-2xl border text-xs sm:text-sm flex items-start justify-between gap-3 shadow-md animate-in fade-in duration-200 ${
             feedbackMessage.type === "success"
-              ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-800 dark:text-emerald-300"
-              : "bg-rose-500/10 border-rose-500/20 text-rose-800 dark:text-rose-300"
+              ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-300"
+              : "bg-rose-500/10 border-rose-500/30 text-rose-800 dark:text-rose-300"
           }`}
         >
           <div className="flex items-center gap-2.5">
@@ -307,207 +402,238 @@ export const SellerVerificationManagementView: React.FC<
             ) : (
               <AlertCircleIcon size={18} className="shrink-0 text-rose-500" />
             )}
-            <span className="font-medium">{feedbackMessage.text}</span>
+            <span className="font-semibold">{feedbackMessage.text}</span>
           </div>
           <button
             type="button"
             onClick={() => setFeedbackMessage(null)}
-            className="text-slate-400 hover:text-slate-600 dark:hover:text-white"
+            className="text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
           >
             <CloseIcon size={16} />
           </button>
         </div>
       )}
 
-      {/* 2. Kartu Statistik Agregat Realtime (Dapat Diklik untuk Filter Cepat) */}
+      {/* ========================================================================= */}
+      {/* 2. KARTU STATISTIK METRIK STATUS INTERAKTIF (MODERN KPI TILES) */}
+      {/* ========================================================================= */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
-        {/* Menunggu Review (Pending) */}
+        {/* 1. Menunggu Review */}
         <button
           type="button"
           onClick={() => setStatusFilter("pending")}
-          className={`p-4 rounded-2xl border text-left transition-all duration-150 cursor-pointer ${
+          className={`p-4 rounded-3xl border text-left transition-all duration-200 cursor-pointer relative overflow-hidden group ${
             statusFilter === "pending"
-              ? "bg-amber-500/15 border-amber-500/40 shadow-xs ring-2 ring-amber-500/20"
-              : "bg-white dark:bg-[#111827] border-slate-200/90 dark:border-white/10 hover:border-amber-500/30"
+              ? "bg-amber-500/15 border-amber-500/50 shadow-md ring-2 ring-amber-500/20"
+              : "bg-white dark:bg-[#0c1220] border-slate-200/90 dark:border-white/10 hover:border-amber-500/40"
           }`}
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
               Menunggu Review
             </span>
-            <div className="h-7 w-7 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-              <ClockIcon size={15} />
+            <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 group-hover:scale-110 transition-transform">
+              <ClockIcon size={16} />
             </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-slate-900 dark:text-white">
+            <span className="text-2xl sm:text-3xl font-black font-mono text-slate-900 dark:text-white">
               {stats.pendingCount}
             </span>
             {stats.pendingCount > 0 && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold animate-pulse">
-                Butuh Tindakan
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold animate-pulse">
+                Action Required
               </span>
             )}
           </div>
+          <p className="text-[11px] text-slate-400 mt-1">Antrean verifikasi berkas</p>
         </button>
 
-        {/* Terverifikasi / ACC */}
+        {/* 2. Official Mall (ACC) */}
         <button
           type="button"
           onClick={() => setStatusFilter("verified")}
-          className={`p-4 rounded-2xl border text-left transition-all duration-150 cursor-pointer ${
+          className={`p-4 rounded-3xl border text-left transition-all duration-200 cursor-pointer relative overflow-hidden group ${
             statusFilter === "verified"
-              ? "bg-emerald-500/15 border-emerald-500/40 shadow-xs ring-2 ring-emerald-500/20"
-              : "bg-white dark:bg-[#111827] border-slate-200/90 dark:border-white/10 hover:border-emerald-500/30"
+              ? "bg-emerald-500/15 border-emerald-500/50 shadow-md ring-2 ring-emerald-500/20"
+              : "bg-white dark:bg-[#0c1220] border-slate-200/90 dark:border-white/10 hover:border-emerald-500/40"
           }`}
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
-              Disetujui (ACC)
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+              Mall Terverifikasi
             </span>
-            <div className="h-7 w-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-              <BadgeCheckIcon size={15} />
+            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 group-hover:scale-110 transition-transform">
+              <BadgeCheckIcon size={16} />
             </div>
           </div>
-          <span className="text-2xl font-bold text-slate-900 dark:text-white">
-            {stats.verifiedCount}
-          </span>
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl sm:text-3xl font-black font-mono text-slate-900 dark:text-white">
+              {stats.verifiedCount}
+            </span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-600/15 text-red-600 dark:text-red-400 font-bold uppercase tracking-tight">
+              Mall
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-400 mt-1">Lencana & lisensi aktif</p>
         </button>
 
-        {/* Ditolak / Perlu Perbaikan */}
+        {/* 3. Ditangguhkan (Suspend) */}
+        <button
+          type="button"
+          onClick={() => setStatusFilter("suspended")}
+          className={`p-4 rounded-3xl border text-left transition-all duration-200 cursor-pointer relative overflow-hidden group ${
+            statusFilter === "suspended"
+              ? "bg-orange-500/15 border-orange-500/50 shadow-md ring-2 ring-orange-500/20"
+              : "bg-white dark:bg-[#0c1220] border-slate-200/90 dark:border-white/10 hover:border-orange-500/40"
+          }`}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-orange-600 dark:text-orange-400">
+              Ditangguhkan
+            </span>
+            <div className="p-2 rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 group-hover:scale-110 transition-transform">
+              <LockIcon size={16} />
+            </div>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl sm:text-3xl font-black font-mono text-slate-900 dark:text-white">
+              {stats.suspendedCount || 0}
+            </span>
+            {(stats.suspendedCount || 0) > 0 && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-700 dark:text-orange-300 font-bold">
+                Penalti Jam
+              </span>
+            )}
+          </div>
+          <p className="text-[11px] text-slate-400 mt-1">Suspend penalti sementara</p>
+        </button>
+
+        {/* 4. Ditolak / Revisi */}
         <button
           type="button"
           onClick={() => setStatusFilter("rejected")}
-          className={`p-4 rounded-2xl border text-left transition-all duration-150 cursor-pointer ${
+          className={`p-4 rounded-3xl border text-left transition-all duration-200 cursor-pointer relative overflow-hidden group ${
             statusFilter === "rejected"
-              ? "bg-rose-500/15 border-rose-500/40 shadow-xs ring-2 ring-rose-500/20"
-              : "bg-white dark:bg-[#111827] border-slate-200/90 dark:border-white/10 hover:border-rose-500/30"
+              ? "bg-rose-500/15 border-rose-500/50 shadow-md ring-2 ring-rose-500/20"
+              : "bg-white dark:bg-[#0c1220] border-slate-200/90 dark:border-white/10 hover:border-rose-500/40"
           }`}
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 uppercase tracking-wider">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
               Ditolak / Revisi
             </span>
-            <div className="h-7 w-7 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center">
-              <XCircleIcon size={15} />
+            <div className="p-2 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 group-hover:scale-110 transition-transform">
+              <XCircleIcon size={16} />
             </div>
           </div>
-          <span className="text-2xl font-bold text-slate-900 dark:text-white">
-            {stats.rejectedCount}
-          </span>
-        </button>
-
-        {/* Belum Mengajukan */}
-        <button
-          type="button"
-          onClick={() => setStatusFilter("unverified")}
-          className={`p-4 rounded-2xl border text-left transition-all duration-150 cursor-pointer ${
-            statusFilter === "unverified"
-              ? "bg-slate-500/15 border-slate-500/40 shadow-xs ring-2 ring-slate-500/20"
-              : "bg-white dark:bg-[#111827] border-slate-200/90 dark:border-white/10 hover:border-slate-500/30"
-          }`}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
-              Belum Ajukan
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl sm:text-3xl font-black font-mono text-slate-900 dark:text-white">
+              {stats.rejectedCount}
             </span>
-            <div className="h-7 w-7 rounded-lg bg-slate-500/10 text-slate-600 dark:text-slate-400 flex items-center justify-center">
-              <FileTextIcon size={15} />
-            </div>
           </div>
-          <span className="text-2xl font-bold text-slate-900 dark:text-white">
-            {stats.unverifiedCount}
-          </span>
+          <p className="text-[11px] text-slate-400 mt-1">Berkas perlu diperbaiki</p>
         </button>
 
-        {/* Total Keseluruhan Penjual */}
+        {/* 5. Total Keseluruhan Toko */}
         <button
           type="button"
           onClick={() => setStatusFilter("all")}
-          className={`p-4 rounded-2xl border text-left transition-all duration-150 cursor-pointer col-span-2 sm:col-span-1 ${
+          className={`p-4 rounded-3xl border text-left transition-all duration-200 cursor-pointer relative overflow-hidden group col-span-2 sm:col-span-1 ${
             statusFilter === "all"
-              ? "bg-blue-500/15 border-blue-500/40 shadow-xs ring-2 ring-blue-500/20"
-              : "bg-white dark:bg-[#111827] border-slate-200/90 dark:border-white/10 hover:border-blue-500/30"
+              ? "bg-blue-500/15 border-blue-500/50 shadow-md ring-2 ring-blue-500/20"
+              : "bg-white dark:bg-[#0c1220] border-slate-200/90 dark:border-white/10 hover:border-blue-500/40"
           }`}
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
-              Total Penjual
+            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+              Total Mitra
             </span>
-            <div className="h-7 w-7 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-              <StoreIcon size={15} />
+            <div className="p-2 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 group-hover:scale-110 transition-transform">
+              <StoreIcon size={16} />
             </div>
           </div>
-          <span className="text-2xl font-bold text-slate-900 dark:text-white">
-            {stats.totalPenjual}
-          </span>
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl sm:text-3xl font-black font-mono text-slate-900 dark:text-white">
+              {stats.totalPenjual}
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-400 mt-1">Seluruh akun terdaftar</p>
         </button>
       </div>
 
-      {/* 3. Bar Kontrol Pencarian, Filter Tab & Sortir */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 p-3.5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/90 dark:border-white/10">
-        {/* Input Pencarian */}
-        <div className="relative flex-1 min-w-[240px]">
-          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-            <SearchIcon size={16} />
-          </div>
+      {/* ========================================================================= */}
+      {/* 3. TOOLBAR PENCARIAN, FILTER PILLS & SORTING */}
+      {/* ========================================================================= */}
+      <div className="p-4 rounded-3xl bg-white dark:bg-[#0c1220] border border-slate-200/90 dark:border-white/10 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-3.5">
+        {/* Search Bar Input */}
+        <div className="relative flex-1 min-w-[260px]">
+          <SearchIcon
+            size={16}
+            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+          />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cari nama toko, username, email, nama pemilik, atau NIK..."
-            className="w-full pl-10 pr-4 py-2 text-xs sm:text-sm rounded-xl bg-slate-50 dark:bg-[#0b132b]/50 border border-slate-200 dark:border-white/10 focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-slate-900 dark:text-white placeholder:text-slate-400"
+            placeholder="Cari toko, @username, email, pemilik KTP, atau NIK..."
+            className="w-full pl-10 pr-9 py-2.5 text-xs sm:text-sm rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-white placeholder:text-slate-400"
           />
           {searchQuery && (
             <button
               type="button"
               onClick={() => setSearchQuery("")}
-              className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-white"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white p-1 rounded-md"
+              title="Hapus pencarian"
             >
               <CloseIcon size={14} />
             </button>
           )}
         </div>
 
-        {/* Tab Pilihan Status */}
+        {/* Tab Pills Filter */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0 scrollbar-none">
           {[
             { key: "all", label: "Semua", count: stats.totalPenjual },
             { key: "pending", label: "Menunggu", count: stats.pendingCount },
-            { key: "verified", label: "Disetujui", count: stats.verifiedCount },
+            { key: "verified", label: "Mall Resmi", count: stats.verifiedCount },
+            { key: "suspended", label: "Ditangguhkan", count: stats.suspendedCount || 0 },
             { key: "rejected", label: "Ditolak", count: stats.rejectedCount },
             { key: "unverified", label: "Belum Ajukan", count: stats.unverifiedCount },
-          ].map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setStatusFilter(tab.key)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer flex items-center gap-1.5 ${
-                statusFilter === tab.key
-                  ? "bg-blue-600 text-white shadow-2xs"
-                  : "bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-white/10"
-              }`}
-            >
-              <span>{tab.label}</span>
-              <span
-                className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                  statusFilter === tab.key
-                    ? "bg-white/20 text-white"
-                    : "bg-slate-200 dark:bg-white/10 text-slate-700 dark:text-slate-300"
+          ].map((tab) => {
+            const isActive = statusFilter === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setStatusFilter(tab.key)}
+                className={`px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                  isActive
+                    ? "bg-blue-600 text-white shadow-sm shadow-blue-600/30"
+                    : "bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                 }`}
               >
-                {tab.count}
-              </span>
-            </button>
-          ))}
+                <span>{tab.label}</span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    isActive
+                      ? "bg-white/20 text-white"
+                      : "bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-400"
+                  }`}
+                >
+                  {tab.count}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Sortir Dropdown */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            className="px-3 py-2 text-xs font-semibold rounded-xl bg-slate-50 dark:bg-[#0b132b]/50 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50 cursor-pointer"
+            className="px-3.5 py-2.5 text-xs font-semibold rounded-2xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-2xs"
           >
             <option value="newest">Prioritas Review & Terbaru</option>
             <option value="submitted_newest">Tgl Pengajuan Terbaru</option>
@@ -517,484 +643,705 @@ export const SellerVerificationManagementView: React.FC<
         </div>
       </div>
 
-      {/* 4. Daftar Penjual (Tabel & Tampilan Responsif) */}
-      <div className="rounded-2xl border border-slate-200/90 dark:border-white/10 bg-white dark:bg-[#111827] overflow-hidden shadow-2xs">
+      {/* ========================================================================= */}
+      {/* 4. TABEL DATA MODERN VERIFIKASI MERCHANT DENGAN PRATINJAU DOKUMEN */}
+      {/* ========================================================================= */}
+      <div className="rounded-3xl bg-white dark:bg-[#0c1220] border border-slate-200/90 dark:border-white/10 shadow-xs overflow-hidden">
         {isLoading ? (
-          <div className="py-20 flex flex-col items-center justify-center text-center">
-            <div className="h-8 w-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mb-3" />
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Memuat data verifikasi penjual realtime...
+          <div className="py-24 flex flex-col items-center justify-center text-center">
+            <div className="h-9 w-9 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-3.5" />
+            <p className="text-xs text-slate-400 font-medium">
+              Memuat data pengajuan verifikasi merchant...
             </p>
           </div>
         ) : sellers.length === 0 ? (
-          <div className="py-16 px-4 text-center">
-            <div className="inline-flex h-14 w-14 rounded-2xl bg-slate-100 dark:bg-white/5 text-slate-400 items-center justify-center mb-3">
+          <div className="py-20 px-4 text-center">
+            <div className="inline-flex h-14 w-14 rounded-3xl bg-slate-100 dark:bg-white/5 text-slate-400 items-center justify-center mb-3">
               <UserCheckIcon size={26} />
             </div>
-            <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white mb-1">
-              Tidak Ada Data Penjual
+            <h3 className="text-sm sm:text-base font-bold text-slate-800 dark:text-slate-200 mb-1">
+              Tidak Ada Mitra Ditemukan
             </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+            <p className="text-xs text-slate-400 max-w-sm mx-auto">
               {searchQuery || statusFilter !== "all"
-                ? "Tidak ada akun penjual yang cocok dengan kriteria filter atau pencarian Anda."
-                : "Belum ada akun penjual yang terdaftar di platform."}
+                ? "Tidak ada toko yang cocok dengan parameter filter atau pencarian Anda."
+                : "Belum ada mitra toko yang mengajukan verifikasi."}
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-200/80 dark:divide-white/10">
-            {sellers.map((seller) => {
-              const isPending = seller.verificationStatus === "pending";
-              const isVerified = seller.verificationStatus === "verified";
-              const isRejected = seller.verificationStatus === "rejected";
-              const isRevealed = !!revealedNiks[seller.id];
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 dark:bg-white/[0.02] border-b border-slate-200/80 dark:border-white/5 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">
+                <tr>
+                  <th scope="col" className="px-5 py-4">Toko & Akun Merchant</th>
+                  <th scope="col" className="px-5 py-4">Identitas Pemilik (KYC)</th>
+                  <th scope="col" className="px-5 py-4 text-center">Dokumen Berkas</th>
+                  <th scope="col" className="px-5 py-4">Status Kelayakan</th>
+                  <th scope="col" className="px-5 py-4">Tanggal Pengajuan</th>
+                  <th scope="col" className="px-5 py-4 text-center">Aksi Administrator</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-white/5 text-slate-700 dark:text-slate-300">
+                {sellers.map((seller) => {
+                  const isPending = seller.verificationStatus === "pending";
+                  const isVerified = seller.verificationStatus === "verified";
+                  const isRejected = seller.verificationStatus === "rejected";
+                  const isSuspended = seller.verificationStatus === "suspended";
+                  const isRevealed = !!revealedNiks[seller.id];
 
-              const maskedNik = seller.verificationData?.idCardNumber
-                ? isRevealed
-                  ? seller.verificationData.idCardNumber
-                  : `${seller.verificationData.idCardNumber.slice(0, 4)}********${seller.verificationData.idCardNumber.slice(-4)}`
-                : "-";
+                  const rawNik = seller.verificationData?.idCardNumber || "";
+                  const maskedNik = rawNik
+                    ? isRevealed
+                      ? rawNik
+                      : rawNik.length > 8
+                      ? `${rawNik.slice(0, 4)}********${rawNik.slice(-4)}`
+                      : rawNik
+                    : "-";
 
-              return (
-                <div
-                  key={seller.id}
-                  className={`p-4 sm:p-5 transition-colors ${
-                    isPending
-                      ? "bg-amber-500/[0.03] dark:bg-amber-500/[0.05] hover:bg-amber-500/[0.07]"
-                      : "hover:bg-slate-50/80 dark:hover:bg-white/[0.02]"
-                  }`}
-                >
-                  <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
-                    {/* Kolom 1: Profil Toko & Status */}
-                    <div className="flex items-start gap-3.5 min-w-0 flex-1">
-                      <div className="relative shrink-0">
-                        <div
-                          className={`h-11 w-11 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center text-white font-bold text-base shadow-xs transition-all ${
-                            isVerified
-                              ? "ring-2 ring-red-500 ring-offset-1 dark:ring-offset-[#111827]"
-                              : ""
-                          }`}
-                        >
-                          {seller.name[0]?.toUpperCase() || "T"}
-                        </div>
-                        {isVerified && (
-                          <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 px-1.5 py-0.2 rounded-xs bg-red-600 text-white text-[7.5px] font-black uppercase tracking-tight shadow-xs border border-white dark:border-[#111827] leading-none pointer-events-none select-none z-10">
-                            Mall
-                          </span>
-                        )}
-                        {/* Dot indicator buka/tutup toko diposisikan di top-right agar tidak bertabrakan dengan badge Mall di border bawah */}
-                        <span
-                          className={`absolute -top-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white dark:border-[#111827] ${
-                            seller.isStoreOpen ? "bg-emerald-500" : "bg-slate-400"
-                          }`}
-                          title={seller.isStoreOpen ? "Toko Buka" : "Toko Libur"}
-                        />
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2 mb-1">
-                          <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate">
-                            {seller.name}
-                          </h3>
-                          <span className="text-xs text-slate-400 font-mono">
-                            @{seller.username}
-                          </span>
-
-                          {/* Badge Status Verifikasi Realtime */}
-                          {isVerified && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
-                              <BadgeCheckIcon size={13} className="text-emerald-500" />
-                              <span>Official Verified (ACC)</span>
-                            </span>
-                          )}
-
-                          {isPending && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 animate-pulse">
-                              <ClockIcon size={13} className="text-amber-500" />
-                              <span>Menunggu Persetujuan Admin</span>
-                            </span>
-                          )}
-
-                          {isRejected && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20">
-                              <XCircleIcon size={13} className="text-rose-500" />
-                              <span>Ditolak / Perlu Perbaikan</span>
-                            </span>
-                          )}
-
-                          {seller.verificationStatus === "unverified" && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-white/10">
-                              Belum Mengajukan
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-y-1 gap-x-3 text-xs text-slate-500 dark:text-slate-400">
-                          <span>{seller.email}</span>
-                          <span>•</span>
-                          <span>
-                            Terdaftar: {formatDate(seller.createdAt)}
-                          </span>
-                          {seller.verificationSubmittedAt && (
-                            <>
-                              <span>•</span>
-                              <span className="text-amber-600 dark:text-amber-400 font-semibold">
-                                Diajukan: {formatDate(seller.verificationSubmittedAt)}
+                  return (
+                    <tr
+                      key={seller.id}
+                      className={`hover:bg-slate-50/70 dark:hover:bg-white/[0.015] transition-colors ${
+                        isPending
+                          ? "bg-amber-500/[0.02] dark:bg-amber-500/[0.03]"
+                          : isSuspended
+                          ? "bg-orange-500/[0.02] dark:bg-orange-500/[0.03]"
+                          : ""
+                      }`}
+                    >
+                      {/* Kolom 1: Profil Toko & Badge Mall */}
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="relative shrink-0">
+                            <div
+                              className={`h-11 w-11 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center text-white font-bold text-base shadow-xs transition-all ${
+                                isVerified
+                                  ? "ring-2 ring-red-500 ring-offset-2 dark:ring-offset-[#0c1220]"
+                                  : isSuspended
+                                  ? "ring-2 ring-orange-500/80 ring-offset-2 dark:ring-offset-[#0c1220]"
+                                  : ""
+                              }`}
+                            >
+                              {seller.name[0]?.toUpperCase() || "T"}
+                            </div>
+                            {isVerified && (
+                              <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 px-1.5 py-0.2 rounded-xs bg-red-600 text-white text-[7.5px] font-black uppercase tracking-tight shadow-xs border border-white dark:border-[#0c1220] leading-none pointer-events-none select-none z-10">
+                                Mall
                               </span>
-                            </>
-                          )}
+                            )}
+                            <span
+                              className={`absolute -top-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white dark:border-[#0c1220] ${
+                                seller.isStoreOpen ? "bg-emerald-500" : "bg-slate-400"
+                              }`}
+                              title={seller.isStoreOpen ? "Toko Buka" : "Toko Libur"}
+                            />
+                          </div>
+
+                          <div className="min-w-0">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenDetailModal(seller)}
+                              className="font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 truncate text-left cursor-pointer text-sm block"
+                            >
+                              {seller.name}
+                            </button>
+                            <div className="text-[11px] text-slate-400 font-mono">
+                              @{seller.username}
+                            </div>
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[180px]">
+                              {seller.email}
+                            </div>
+                          </div>
                         </div>
+                      </td>
 
-                        {/* Rincian Berkas Identitas Pemilik yang Diajukan */}
-                        {seller.verificationData && (
-                          <div className="mt-3 p-3 rounded-xl bg-slate-50 dark:bg-[#0b132b]/50 border border-slate-200/70 dark:border-white/5 text-xs grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
-                            <div>
-                              <p className="text-[10px] text-slate-400 uppercase font-bold">
-                                Nama Pemilik KTP
-                              </p>
-                              <p className="font-semibold text-slate-800 dark:text-slate-200 truncate">
-                                {seller.verificationData.ownerName || "-"}
-                              </p>
-                            </div>
-
-                            <div>
-                              <p className="text-[10px] text-slate-400 uppercase font-bold flex items-center justify-between">
-                                <span>Nomor NIK</span>
-                                <button
-                                  type="button"
-                                  onClick={() => toggleRevealNik(seller.id)}
-                                  className="text-[10px] text-blue-500 hover:underline cursor-pointer"
-                                >
-                                  {isRevealed ? "Tutup" : "Lihat"}
-                                </button>
-                              </p>
-                              <p className="font-mono font-semibold text-slate-800 dark:text-slate-200">
-                                {maskedNik}
-                              </p>
-                            </div>
-
-                            <div>
-                              <p className="text-[10px] text-slate-400 uppercase font-bold">
-                                No. WhatsApp
-                              </p>
-                              <p className="font-medium text-slate-800 dark:text-slate-200">
-                                {seller.verificationData.phoneNumber || "-"}
-                              </p>
-                            </div>
-
-                            <div>
-                              <p className="text-[10px] text-slate-400 uppercase font-bold">
-                                Tipe Bisnis
-                              </p>
-                              <span className="inline-block px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-300 font-medium text-[11px]">
+                      {/* Kolom 2: Identitas Pemilik (KYC) */}
+                      <td className="px-5 py-4">
+                        {seller.verificationData ? (
+                          <div className="space-y-1">
+                            <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
+                              <span>{seller.verificationData.ownerName || seller.name}</span>
+                              <span className="px-1.5 py-0.2 rounded-md bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-300 text-[10px] font-medium border border-blue-200/50 dark:border-blue-800/40">
                                 {getBusinessTypeLabel(seller.verificationData.businessType)}
                               </span>
                             </div>
+
+                            <div className="flex items-center gap-2 text-[11px]">
+                              <span className="text-slate-400 font-mono">NIK: {maskedNik}</span>
+                              {seller.verificationData.idCardNumber && (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleRevealNik(seller.id)}
+                                  className="text-[10px] text-blue-500 hover:text-blue-600 dark:text-blue-400 font-semibold cursor-pointer"
+                                >
+                                  {isRevealed ? "Tutup" : "Lihat"}
+                                </button>
+                              )}
+                            </div>
+
+                            {seller.verificationData.phoneNumber && (
+                              <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                                <span>WA: {seller.verificationData.phoneNumber}</span>
+                                {getWhatsAppLink(seller.verificationData.phoneNumber) && (
+                                  <a
+                                    href={getWhatsAppLink(seller.verificationData.phoneNumber)!}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-emerald-500 hover:text-emerald-600"
+                                    title="Hubungi via WhatsApp"
+                                  >
+                                    <ExternalLinkIcon size={11} />
+                                  </a>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 italic">Belum mengisi berkas</span>
+                        )}
+                      </td>
+
+                      {/* Kolom 3: Dokumen Berkas Foto (Thumbnails Interaktif) */}
+                      <td className="px-5 py-4 text-center">
+                        {seller.verificationData?.idCardPhoto ||
+                        seller.verificationData?.selfiePhoto ? (
+                          <div className="flex items-center justify-center gap-2">
+                            {/* Thumbnail Foto KTP */}
+                            {seller.verificationData.idCardPhoto ? (
+                              <div
+                                onClick={() =>
+                                  setPreviewPhoto({
+                                    url: seller.verificationData!.idCardPhoto!,
+                                    title: `Foto KTP Asli - ${seller.name}`,
+                                  })
+                                }
+                                className="relative group w-11 h-8 rounded-lg overflow-hidden border border-slate-200 dark:border-white/10 cursor-pointer shadow-2xs hover:scale-105 transition-transform"
+                                title="Lihat Foto KTP Asli"
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={seller.verificationData.idCardPhoto}
+                                  alt="KTP"
+                                  className="w-full h-full object-cover"
+                                />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity">
+                                  <EyeIcon size={12} />
+                                </div>
+                              </div>
+                            ) : null}
+
+                            {/* Thumbnail Foto Selfie */}
+                            {seller.verificationData.selfiePhoto ? (
+                              <div
+                                onClick={() =>
+                                  setPreviewPhoto({
+                                    url: seller.verificationData!.selfiePhoto!,
+                                    title: `Foto Selfie Memegang KTP - ${seller.name}`,
+                                  })
+                                }
+                                className="relative group w-11 h-8 rounded-lg overflow-hidden border border-slate-200 dark:border-white/10 cursor-pointer shadow-2xs hover:scale-105 transition-transform"
+                                title="Lihat Foto Selfie KTP"
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={seller.verificationData.selfiePhoto}
+                                  alt="Selfie"
+                                  className="w-full h-full object-cover"
+                                />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity">
+                                  <EyeIcon size={12} />
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-slate-400 bg-slate-100 dark:bg-white/5 px-2 py-0.5 rounded-md">
+                            Tidak Ada
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Kolom 4: Status Kelayakan */}
+                      <td className="px-5 py-4">
+                        {isVerified && (
+                          <div className="space-y-0.5">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
+                              <BadgeCheckIcon size={13} className="text-emerald-500" />
+                              <span>Official Mall (ACC)</span>
+                            </span>
+                            <p className="text-[10px] text-slate-400">Lisensi Mall aktif</p>
                           </div>
                         )}
 
-                        {/* Banner Alasan Penolakan Jika Sedang Ditolak */}
-                        {isRejected && seller.verificationRejectionReason && (
-                          <div className="mt-2.5 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-800 dark:text-rose-300">
-                            <span className="font-bold">Alasan Penolakan: </span>
-                            <span>{seller.verificationRejectionReason}</span>
+                        {isPending && (
+                          <div className="space-y-0.5">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 animate-pulse">
+                              <ClockIcon size={13} className="text-amber-500" />
+                              <span>Menunggu Review</span>
+                            </span>
+                            <p className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold">
+                              Perlu audit berkas
+                            </p>
                           </div>
                         )}
-                      </div>
-                    </div>
 
-                    {/* Kolom 2: Tombol Aksi ACC, Tolak, dan Detail */}
-                    <div className="flex flex-wrap items-center gap-2 self-end lg:self-start shrink-0 pt-2 lg:pt-0">
-                      {/* Tombol Rincian Berkas Dokumen */}
-                      <button
-                        type="button"
-                        onClick={() => handleOpenDetailModal(seller)}
-                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200/80 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
-                        title="Lihat foto KTP, selfie, dan rincian lengkap"
-                      >
-                        <FileTextIcon size={14} className="text-slate-500" />
-                        <span>Rincian & Foto</span>
-                      </button>
+                        {isSuspended && (
+                          <div className="space-y-1">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-orange-500/15 text-orange-700 dark:text-orange-300 border border-orange-500/30">
+                              <LockIcon size={12} className="text-orange-500" />
+                              <span>Ditangguhkan ({seller.mallSuspensionHours || "-"} Jam)</span>
+                            </span>
+                            {seller.mallSuspensionReason && (
+                              <p
+                                className="text-[10px] text-orange-600 dark:text-orange-400 font-medium truncate max-w-[160px]"
+                                title={seller.mallSuspensionReason}
+                              >
+                                Alasan: {seller.mallSuspensionReason}
+                              </p>
+                            )}
+                          </div>
+                        )}
 
-                      {/* Tombol Cepat: ACC (Setujui) */}
-                      {!isVerified && (
-                        <button
-                          type="button"
-                          onClick={() => handleOpenDecisionModal(seller, "approve")}
-                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs transition-colors cursor-pointer active:scale-95"
-                          title="Setujui verifikasi toko (ACC)"
-                        >
-                          <CheckIcon size={14} />
-                          <span>ACC (Setujui)</span>
-                        </button>
-                      )}
+                        {isRejected && (
+                          <div className="space-y-0.5">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/25">
+                              <XCircleIcon size={13} className="text-rose-500" />
+                              <span>Ditolak / Revisi</span>
+                            </span>
+                            {seller.verificationRejectionReason && (
+                              <p
+                                className="text-[10px] text-rose-500 truncate max-w-[160px]"
+                                title={seller.verificationRejectionReason}
+                              >
+                                {seller.verificationRejectionReason}
+                              </p>
+                            )}
+                          </div>
+                        )}
 
-                      {/* Tombol Cepat: Tolak dengan Alasan */}
-                      {!isRejected && (
-                        <button
-                          type="button"
-                          onClick={() => handleOpenDecisionModal(seller, "reject")}
-                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white shadow-2xs transition-colors cursor-pointer active:scale-95"
-                          title="Tolak pengajuan dengan alasan perbaikan"
-                        >
-                          <XCircleIcon size={14} />
-                          <span>Tolak</span>
-                        </button>
-                      )}
+                        {seller.verificationStatus === "unverified" && (
+                          <div className="space-y-0.5">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-white/10">
+                              Belum Mengajukan
+                            </span>
+                            {seller.verificationRejectionReason && (
+                              <p
+                                className="text-[10px] text-rose-500 truncate max-w-[160px]"
+                                title={seller.verificationRejectionReason}
+                              >
+                                Mall Dicabut: {seller.verificationRejectionReason}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </td>
 
-                      {/* Tombol Kembalikan ke Pending / Tinjau Ulang */}
-                      {!isPending && (
-                        <button
-                          type="button"
-                          onClick={() => handleOpenDecisionModal(seller, "pending")}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/20 transition-colors cursor-pointer"
-                          title="Kembalikan status ke Menunggu Tinjauan"
-                        >
-                          <ClockIcon size={14} />
-                          <span>Set Pending</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+                      {/* Kolom 5: Tanggal Pengajuan */}
+                      <td className="px-5 py-4">
+                        <div className="text-xs text-slate-700 dark:text-slate-300 font-medium">
+                          {seller.verificationSubmittedAt
+                            ? formatDate(seller.verificationSubmittedAt)
+                            : formatDate(seller.createdAt)}
+                        </div>
+                        <span className="text-[10px] text-slate-400">
+                          {seller.verificationSubmittedAt ? "Tgl Berkas Masuk" : "Tgl Akun Terdaftar"}
+                        </span>
+                      </td>
+
+                      {/* Kolom 6: Aksi Administrator */}
+                      <td className="px-5 py-4 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          {/* Tombol Rincian Berkas */}
+                          <button
+                            type="button"
+                            onClick={() => handleOpenDetailModal(seller)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/5 text-slate-700 dark:text-slate-200 font-semibold text-xs transition-colors cursor-pointer"
+                            title="Buka berkas lengkap dan foto dokumen"
+                          >
+                            <FileTextIcon size={13} className="text-slate-400" />
+                            <span>Rincian</span>
+                          </button>
+
+                          {/* Tombol ACC Cepat jika Pending atau Unverified */}
+                          {!isVerified && !isSuspended && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenDecisionModal(seller, "approve")}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
+                              title="Setujui verifikasi toko (ACC)"
+                            >
+                              <CheckIcon size={13} />
+                              <span>ACC</span>
+                            </button>
+                          )}
+
+                          {/* Tombol Suspend jika Verified */}
+                          {isVerified && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenDecisionModal(seller, "suspend")}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-orange-500/30 bg-orange-500/10 hover:bg-orange-500/20 text-orange-700 dark:text-orange-300 font-semibold text-xs transition-colors cursor-pointer"
+                              title="Suspend sementara Mall toko"
+                            >
+                              <LockIcon size={12} />
+                              <span>Suspend</span>
+                            </button>
+                          )}
+
+                          {/* Tombol Hentikan jika Verified */}
+                          {isVerified && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenDecisionModal(seller, "revoke")}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs shadow-xs transition-colors cursor-pointer"
+                              title="Hentikan / Cabut status Mall"
+                            >
+                              <CloseIcon size={12} />
+                              <span>Hentikan</span>
+                            </button>
+                          )}
+
+                          {/* Tombol Aktifkan jika Suspended */}
+                          {isSuspended && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenDecisionModal(seller, "approve")}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
+                              title="Pulihkan status Mall toko"
+                            >
+                              <CheckIcon size={13} />
+                              <span>Aktifkan</span>
+                            </button>
+                          )}
+
+                          {/* Tombol Tolak jika Pending */}
+                          {isPending && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenDecisionModal(seller, "reject")}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-rose-300 dark:border-rose-900/50 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-rose-600 dark:text-rose-400 font-semibold text-xs transition-colors cursor-pointer"
+                              title="Tolak berkas dengan alasan perbaikan"
+                            >
+                              <XCircleIcon size={13} />
+                              <span>Tolak</span>
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
 
-      {/* 5. Modal Rincian Berkas & Foto Dokumen Penjual */}
+      {/* ========================================================================= */}
+      {/* 5. MODAL DETAIL BERKAS & DOKUMEN FOTO PENJUAL (INSPEKSI AUDIT LENGKAP) */}
+      {/* ========================================================================= */}
       {isDetailModalOpen && selectedSeller && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs">
-          <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-white/10 shadow-2xl p-6 sm:p-7">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in">
+          <div className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white dark:bg-[#0c1220] border border-slate-200 dark:border-white/10 shadow-2xl p-6 sm:p-8 space-y-6">
             {/* Header Modal */}
-            <div className="flex items-start justify-between pb-4 mb-4 border-b border-slate-200/80 dark:border-white/10">
-              <div className="flex items-center gap-3">
+            <div className="flex items-start justify-between pb-4 border-b border-slate-100 dark:border-white/5">
+              <div className="flex items-center gap-3.5">
                 <div className="relative shrink-0">
                   <div
-                    className={`h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center text-white font-bold text-base shadow-xs transition-all ${
+                    className={`h-12 w-12 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center text-white font-bold text-lg shadow-sm ${
                       selectedSeller.verificationStatus === "verified"
-                        ? "ring-2 ring-red-500 ring-offset-1 dark:ring-offset-[#111827]"
+                        ? "ring-2 ring-red-500 ring-offset-2 dark:ring-offset-[#0c1220]"
                         : ""
                     }`}
                   >
                     {selectedSeller.name[0]?.toUpperCase() || "T"}
                   </div>
                   {selectedSeller.verificationStatus === "verified" && (
-                    <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 px-1.5 py-0.2 rounded-xs bg-red-600 text-white text-[7.5px] font-black uppercase tracking-tight shadow-xs border border-white dark:border-[#111827] leading-none pointer-events-none select-none z-10">
+                    <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 px-1.5 py-0.2 rounded-xs bg-red-600 text-white text-[7.5px] font-black uppercase tracking-tight shadow-xs border border-white dark:border-[#0c1220] leading-none pointer-events-none select-none z-10">
                       Mall
                     </span>
                   )}
                 </div>
                 <div>
-                  <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
-                    Rincian Pengajuan Verifikasi: {selectedSeller.name}
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                    Audit Berkas: {selectedSeller.name}
                   </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Akun: @{selectedSeller.username} • {selectedSeller.email}
+                  <p className="text-xs text-slate-400">
+                    @{selectedSeller.username} • {selectedSeller.email}
                   </p>
                 </div>
               </div>
+
               <button
                 type="button"
                 onClick={() => setIsDetailModalOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5"
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
               >
                 <CloseIcon size={20} />
               </button>
             </div>
 
-            {/* Informasi Identitas Lengkap */}
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 rounded-2xl bg-slate-50 dark:bg-[#0b132b]/50 border border-slate-200/70 dark:border-white/5 text-xs">
-                <div>
-                  <span className="text-slate-400 font-bold uppercase text-[10px]">
-                    Nama Lengkap Pemilik KTP
-                  </span>
-                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 mt-0.5">
-                    {selectedSeller.verificationData?.ownerName || selectedSeller.name}
-                  </p>
-                </div>
-
-                <div>
-                  <span className="text-slate-400 font-bold uppercase text-[10px]">
-                    Nomor NIK / Paspor
-                  </span>
-                  <p className="text-sm font-mono font-semibold text-slate-800 dark:text-slate-100 mt-0.5">
-                    {selectedSeller.verificationData?.idCardNumber || "-"}
-                  </p>
-                </div>
-
-                <div>
-                  <span className="text-slate-400 font-bold uppercase text-[10px]">
-                    Nomor WhatsApp / Telepon
-                  </span>
-                  <p className="text-sm font-medium text-slate-800 dark:text-slate-100 mt-0.5">
-                    {selectedSeller.verificationData?.phoneNumber || "-"}
-                  </p>
-                </div>
-
-                <div>
-                  <span className="text-slate-400 font-bold uppercase text-[10px]">
-                    Model / Jenis Usaha
-                  </span>
-                  <p className="text-sm font-medium text-slate-800 dark:text-slate-100 mt-0.5">
-                    {getBusinessTypeLabel(selectedSeller.verificationData?.businessType)}
-                  </p>
-                </div>
-
-                <div className="sm:col-span-2">
-                  <span className="text-slate-400 font-bold uppercase text-[10px]">
-                    Deskripsi Profil Toko
-                  </span>
-                  <p className="text-xs text-slate-700 dark:text-slate-300 mt-0.5 leading-relaxed">
-                    {selectedSeller.verificationData?.storeDescription ||
-                      "Tidak menyertakan deskripsi tambahan."}
-                  </p>
-                </div>
-
-                {selectedSeller.verificationData?.notes && (
-                  <div className="sm:col-span-2 p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-700 dark:text-blue-300">
-                    <span className="font-bold">Catatan Penjual ke Admin: </span>
-                    <span>{selectedSeller.verificationData.notes}</span>
-                  </div>
-                )}
+            {/* Grid Informasi Identitas Pemilik */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 p-4 rounded-2xl bg-slate-50 dark:bg-white/[0.02] border border-slate-200/80 dark:border-white/5 text-xs">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">
+                  Nama Pemilik Sesuai KTP
+                </span>
+                <p className="font-bold text-slate-900 dark:text-white text-sm">
+                  {selectedSeller.verificationData?.ownerName || selectedSeller.name}
+                </p>
               </div>
 
-              {/* Foto Dokumen Identitas (KTP & Selfie) */}
               <div>
-                <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-2.5">
-                  Dokumen Foto yang Diunggah
-                </h4>
+                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">
+                  Nomor NIK KTP
+                </span>
+                <p className="font-mono font-bold text-slate-900 dark:text-white text-sm">
+                  {selectedSeller.verificationData?.idCardNumber || "-"}
+                </p>
+              </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Foto KTP */}
-                  <div className="p-3 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-white/[0.02]">
-                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">
+                  Kontak WhatsApp
+                </span>
+                <p className="font-medium text-slate-900 dark:text-white">
+                  {selectedSeller.verificationData?.phoneNumber || "-"}
+                </p>
+              </div>
+
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">
+                  Kategori Usaha
+                </span>
+                <span className="inline-block px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-300 font-semibold text-[11px]">
+                  {getBusinessTypeLabel(selectedSeller.verificationData?.businessType)}
+                </span>
+              </div>
+
+              <div className="sm:col-span-2 md:col-span-4 pt-2 border-t border-slate-200/60 dark:border-white/5">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">
+                  Deskripsi Profil Toko
+                </span>
+                <p className="text-slate-700 dark:text-slate-300 leading-relaxed text-xs">
+                  {selectedSeller.verificationData?.storeDescription || "Tidak ada deskripsi toko."}
+                </p>
+              </div>
+
+              {selectedSeller.verificationData?.notes && (
+                <div className="sm:col-span-2 md:col-span-4 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-700 dark:text-blue-300">
+                  <span className="font-bold">Catatan Mitra ke Admin: </span>
+                  <span>{selectedSeller.verificationData.notes}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Dokumen Foto KTP & Selfie Berdampingan */}
+            <div>
+              <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-3">
+                Dokumen Bukti Identitas yang Diunggah
+              </h4>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Foto KTP */}
+                <div className="p-3.5 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-white/[0.02]">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
                       Foto KTP Asli
-                    </p>
-                    {selectedSeller.verificationData?.idCardPhoto ? (
-                      <div className="relative group rounded-xl overflow-hidden border border-slate-200 dark:border-white/10 bg-black/5 dark:bg-black/30 aspect-4/3 flex items-center justify-center">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={selectedSeller.verificationData.idCardPhoto}
-                          alt="Foto KTP"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                        />
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setPreviewPhoto({
-                              url: selectedSeller.verificationData!.idCardPhoto!,
-                              title: `Foto KTP - ${selectedSeller.name}`,
-                            })
-                          }
-                          className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-semibold gap-1.5"
-                        >
-                          <EyeIcon size={16} />
-                          <span>Perbesar Foto</span>
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="aspect-4/3 rounded-xl border border-dashed border-slate-300 dark:border-white/10 flex flex-col items-center justify-center text-slate-400 text-xs">
-                        <FileTextIcon size={24} className="mb-1 opacity-50" />
-                        <span>Tidak ada foto KTP</span>
-                      </div>
+                    </span>
+                    {selectedSeller.verificationData?.idCardPhoto && (
+                      <span className="text-[10px] text-blue-500 font-semibold">
+                        Klik untuk perbesar
+                      </span>
                     )}
                   </div>
 
-                  {/* Foto Selfie dengan KTP */}
-                  <div className="p-3 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-white/[0.02]">
-                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                  {selectedSeller.verificationData?.idCardPhoto ? (
+                    <div
+                      onClick={() =>
+                        setPreviewPhoto({
+                          url: selectedSeller.verificationData!.idCardPhoto!,
+                          title: `Foto KTP - ${selectedSeller.name}`,
+                        })
+                      }
+                      className="relative group rounded-xl overflow-hidden aspect-4/3 bg-black/5 dark:bg-black/30 border border-slate-200 dark:border-white/10 cursor-pointer"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={selectedSeller.verificationData.idCardPhoto}
+                        alt="Foto KTP"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-bold gap-1.5 transition-opacity">
+                        <EyeIcon size={16} />
+                        <span>Perbesar Dokumen</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="aspect-4/3 rounded-xl border border-dashed border-slate-300 dark:border-white/10 flex flex-col items-center justify-center text-slate-400 text-xs">
+                      <FileTextIcon size={24} className="mb-1 opacity-50" />
+                      <span>Tidak ada foto KTP</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Foto Selfie dengan KTP */}
+                <div className="p-3.5 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-white/[0.02]">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
                       Foto Selfie Memegang KTP
-                    </p>
-                    {selectedSeller.verificationData?.selfiePhoto ? (
-                      <div className="relative group rounded-xl overflow-hidden border border-slate-200 dark:border-white/10 bg-black/5 dark:bg-black/30 aspect-4/3 flex items-center justify-center">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={selectedSeller.verificationData.selfiePhoto}
-                          alt="Foto Selfie dengan KTP"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                        />
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setPreviewPhoto({
-                              url: selectedSeller.verificationData!.selfiePhoto!,
-                              title: `Foto Selfie KTP - ${selectedSeller.name}`,
-                            })
-                          }
-                          className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-semibold gap-1.5"
-                        >
-                          <EyeIcon size={16} />
-                          <span>Perbesar Foto</span>
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="aspect-4/3 rounded-xl border border-dashed border-slate-300 dark:border-white/10 flex flex-col items-center justify-center text-slate-400 text-xs">
-                        <UserCheckIcon size={24} className="mb-1 opacity-50" />
-                        <span>Tidak ada foto selfie</span>
-                      </div>
+                    </span>
+                    {selectedSeller.verificationData?.selfiePhoto && (
+                      <span className="text-[10px] text-blue-500 font-semibold">
+                        Klik untuk perbesar
+                      </span>
                     )}
                   </div>
+
+                  {selectedSeller.verificationData?.selfiePhoto ? (
+                    <div
+                      onClick={() =>
+                        setPreviewPhoto({
+                          url: selectedSeller.verificationData!.selfiePhoto!,
+                          title: `Foto Selfie KTP - ${selectedSeller.name}`,
+                        })
+                      }
+                      className="relative group rounded-xl overflow-hidden aspect-4/3 bg-black/5 dark:bg-black/30 border border-slate-200 dark:border-white/10 cursor-pointer"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={selectedSeller.verificationData.selfiePhoto}
+                        alt="Foto Selfie"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-bold gap-1.5 transition-opacity">
+                        <EyeIcon size={16} />
+                        <span>Perbesar Dokumen</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="aspect-4/3 rounded-xl border border-dashed border-slate-300 dark:border-white/10 flex flex-col items-center justify-center text-slate-400 text-xs">
+                      <UserCheckIcon size={24} className="mb-1 opacity-50" />
+                      <span>Tidak ada foto selfie</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* Footer Aksi Modal Detail */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-5 mt-5 border-t border-slate-200/80 dark:border-white/10">
+            {/* Footer Aksi Langsung dari Modal Detail */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-100 dark:border-white/5">
               <button
                 type="button"
                 onClick={() => setIsDetailModalOpen(false)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200/80 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
+                className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 cursor-pointer"
               >
                 Tutup
               </button>
 
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsDetailModalOpen(false);
-                    handleOpenDecisionModal(selectedSeller, "reject");
-                  }}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white shadow-2xs transition-colors cursor-pointer"
-                >
-                  Tolak Berkas
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsDetailModalOpen(false);
-                    handleOpenDecisionModal(selectedSeller, "approve");
-                  }}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs transition-colors cursor-pointer"
-                >
-                  ACC (Setujui)
-                </button>
+                {selectedSeller.verificationStatus === "verified" ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsDetailModalOpen(false);
+                        handleOpenDecisionModal(selectedSeller, "suspend");
+                      }}
+                      className="px-4 py-2.5 rounded-xl text-xs font-bold bg-orange-500/10 hover:bg-orange-500/20 text-orange-700 dark:text-orange-300 border border-orange-500/30 cursor-pointer"
+                    >
+                      Suspend Toko
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsDetailModalOpen(false);
+                        handleOpenDecisionModal(selectedSeller, "revoke");
+                      }}
+                      className="px-4 py-2.5 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white cursor-pointer shadow-xs"
+                    >
+                      Hentikan Mall
+                    </button>
+                  </>
+                ) : selectedSeller.verificationStatus === "suspended" ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsDetailModalOpen(false);
+                        handleOpenDecisionModal(selectedSeller, "revoke");
+                      }}
+                      className="px-4 py-2.5 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white cursor-pointer"
+                    >
+                      Cabut Mall
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsDetailModalOpen(false);
+                        handleOpenDecisionModal(selectedSeller, "approve");
+                      }}
+                      className="px-4 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer shadow-xs"
+                    >
+                      Aktifkan Kembali Mall
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsDetailModalOpen(false);
+                        handleOpenDecisionModal(selectedSeller, "reject");
+                      }}
+                      className="px-4 py-2.5 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white cursor-pointer shadow-xs"
+                    >
+                      Tolak Pengajuan
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsDetailModalOpen(false);
+                        handleOpenDecisionModal(selectedSeller, "approve");
+                      }}
+                      className="px-4 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer shadow-xs"
+                    >
+                      ACC (Setujui Mall)
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* 6. Modal Pengambilan Keputusan (ACC, Tolak dengan Alasan, atau Pending) */}
+      {/* ========================================================================= */}
+      {/* 6. MODAL KEPUTUSAN & SANKSI (ACC, SUSPEND JAM, HENTIKAN, TOLAK) */}
+      {/* ========================================================================= */}
       {isDecisionModalOpen && selectedSeller && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs">
-          <div className="relative w-full max-w-lg rounded-3xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-white/10 shadow-2xl p-6 sm:p-7">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in">
+          <div className="relative w-full max-w-lg rounded-3xl bg-white dark:bg-[#0c1220] border border-slate-200 dark:border-white/10 shadow-2xl p-6 sm:p-7 space-y-5">
             {/* Header Modal */}
-            <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-200/80 dark:border-white/10">
+            <div className="flex items-center justify-between pb-3.5 border-b border-slate-100 dark:border-white/5">
               <div className="flex items-center gap-2.5">
                 <div
-                  className={`h-9 w-9 rounded-xl flex items-center justify-center ${
+                  className={`p-2 rounded-xl ${
                     decisionType === "approve"
-                      ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
-                      : decisionType === "reject"
-                      ? "bg-rose-500/10 text-rose-600 border border-rose-500/20"
-                      : "bg-amber-500/10 text-amber-600 border border-amber-500/20"
+                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                      : decisionType === "revoke" || decisionType === "reject"
+                      ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
+                      : decisionType === "suspend"
+                      ? "bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20"
+                      : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
                   }`}
                 >
                   {decisionType === "approve" ? (
                     <BadgeCheckIcon size={20} />
+                  ) : decisionType === "revoke" ? (
+                    <CloseIcon size={20} />
+                  ) : decisionType === "suspend" ? (
+                    <LockIcon size={20} />
                   ) : decisionType === "reject" ? (
                     <XCircleIcon size={20} />
                   ) : (
@@ -1004,87 +1351,335 @@ export const SellerVerificationManagementView: React.FC<
                 <div>
                   <h3 className="text-base font-bold text-slate-900 dark:text-white">
                     {decisionType === "approve"
-                      ? "Setujui Verifikasi (ACC)"
+                      ? selectedSeller.verificationStatus === "suspended"
+                        ? "Aktifkan Kembali Status Mall"
+                        : "Persetujuan Resmi Mall (ACC)"
+                      : decisionType === "revoke"
+                      ? "Hentikan / Cabut Mall Penjual"
+                      : decisionType === "suspend"
+                      ? "Suspend Sementara Toko Mall"
                       : decisionType === "reject"
                       ? "Tolak Pengajuan Verifikasi"
                       : "Kembalikan ke Status Ditinjau (Pending)"}
                   </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Toko: {selectedSeller.name} (@{selectedSeller.username})
+                  <p className="text-xs text-slate-400">
+                    Toko: <strong>{selectedSeller.name}</strong> (@{selectedSeller.username})
                   </p>
                 </div>
               </div>
+
               <button
                 type="button"
                 onClick={() => setIsDecisionModalOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5"
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
               >
                 <CloseIcon size={18} />
               </button>
             </div>
 
-            {/* Pilihan Tipe Keputusan Tab */}
-            <div className="mb-4">
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                Pilih Keputusan Admin:
+            {/* Pilihan Keputusan Switcher Tab */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
+                Pilih Keputusan Tindakan:
               </label>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setDecisionType("approve")}
-                  className={`p-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer flex flex-col items-center gap-1 ${
-                    decisionType === "approve"
-                      ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
-                      : "bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300"
-                  }`}
-                >
-                  <CheckIcon size={16} />
-                  <span>ACC (Setujui)</span>
-                </button>
 
-                <button
-                  type="button"
-                  onClick={() => setDecisionType("reject")}
-                  className={`p-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer flex flex-col items-center gap-1 ${
-                    decisionType === "reject"
-                      ? "bg-rose-600 text-white border-rose-600 shadow-xs"
-                      : "bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300"
-                  }`}
-                >
-                  <XCircleIcon size={16} />
-                  <span>Tolak</span>
-                </button>
+              {selectedSeller.verificationStatus === "verified" ? (
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDecisionType("suspend")}
+                    className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                      decisionType === "suspend"
+                        ? "bg-orange-600 text-white border-orange-600 shadow-xs"
+                        : "bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300"
+                    }`}
+                  >
+                    <LockIcon size={16} />
+                    <span>Suspend Mall</span>
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => setDecisionType("pending")}
-                  className={`p-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer flex flex-col items-center gap-1 ${
-                    decisionType === "pending"
-                      ? "bg-amber-600 text-white border-amber-600 shadow-xs"
-                      : "bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300"
-                  }`}
-                >
-                  <ClockIcon size={16} />
-                  <span>Pending</span>
-                </button>
-              </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDecisionType("revoke");
+                      if (!rejectionReason) {
+                        setRejectionReason("kontrak telah berakhir silahkan perpanjang kontrak");
+                      }
+                    }}
+                    className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                      decisionType === "revoke"
+                        ? "bg-rose-600 text-white border-rose-600 shadow-xs"
+                        : "bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300"
+                    }`}
+                  >
+                    <CloseIcon size={16} />
+                    <span>Hentikan Mall</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDecisionType("pending")}
+                    className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                      decisionType === "pending"
+                        ? "bg-amber-600 text-white border-amber-600 shadow-xs"
+                        : "bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300"
+                    }`}
+                  >
+                    <ClockIcon size={16} />
+                    <span>Set Pending</span>
+                  </button>
+                </div>
+              ) : selectedSeller.verificationStatus === "suspended" ? (
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDecisionType("approve")}
+                    className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                      decisionType === "approve"
+                        ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
+                        : "bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300"
+                    }`}
+                  >
+                    <CheckIcon size={16} />
+                    <span>Aktifkan Mall</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDecisionType("suspend")}
+                    className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                      decisionType === "suspend"
+                        ? "bg-orange-600 text-white border-orange-600 shadow-xs"
+                        : "bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300"
+                    }`}
+                  >
+                    <LockIcon size={16} />
+                    <span>Ubah Suspend</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDecisionType("revoke");
+                      if (!rejectionReason) {
+                        setRejectionReason("toko melanggar pedoman komunitas dan standar kemitraan Mall");
+                      }
+                    }}
+                    className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                      decisionType === "revoke"
+                        ? "bg-rose-600 text-white border-rose-600 shadow-xs"
+                        : "bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300"
+                    }`}
+                  >
+                    <CloseIcon size={16} />
+                    <span>Cabut Mall</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-4 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDecisionType("approve")}
+                    className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                      decisionType === "approve"
+                        ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
+                        : "bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300"
+                    }`}
+                  >
+                    <CheckIcon size={16} />
+                    <span>ACC</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDecisionType("reject")}
+                    className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                      decisionType === "reject"
+                        ? "bg-rose-600 text-white border-rose-600 shadow-xs"
+                        : "bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300"
+                    }`}
+                  >
+                    <XCircleIcon size={16} />
+                    <span>Tolak</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDecisionType("suspend")}
+                    className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                      decisionType === "suspend"
+                        ? "bg-orange-600 text-white border-orange-600 shadow-xs"
+                        : "bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300"
+                    }`}
+                  >
+                    <LockIcon size={16} />
+                    <span>Suspend</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDecisionType("pending")}
+                    className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                      decisionType === "pending"
+                        ? "bg-amber-600 text-white border-amber-600 shadow-xs"
+                        : "bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300"
+                    }`}
+                  >
+                    <ClockIcon size={16} />
+                    <span>Pending</span>
+                  </button>
+                </div>
+              )}
             </div>
 
-            {/* Penjelasan atau Input Alasan */}
+            {/* Konten Form Dinamis Berdasarkan Keputusan */}
             {decisionType === "approve" && (
-              <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-800 dark:text-emerald-300 mb-5 space-y-1.5">
+              <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-800 dark:text-emerald-300 space-y-1.5">
                 <p className="font-bold flex items-center gap-1.5">
                   <BadgeCheckIcon size={16} className="text-emerald-600" />
-                  <span>Persetujuan Resmi (Official Merchant)</span>
+                  <span>
+                    {selectedSeller.verificationStatus === "suspended"
+                      ? "Pemulihan Hak Mall Toko"
+                      : "Persetujuan Resmi (Official Merchant)"}
+                  </span>
                 </p>
                 <p className="leading-relaxed">
-                  Dengan menyetujui, toko akan langsung mendapatkan lencana <strong>Verified Merchant</strong>, prioritas pencarian, dan akses fitur pencairan saldo instan.
+                  {selectedSeller.verificationStatus === "suspended"
+                    ? "Status suspend akan segera dicabut. Lencana resmi dan border merah Mall toko akan kembali aktif seketika."
+                    : "Dengan menyetujui, toko akan langsung mendapatkan lencana Verified Merchant, border merah Mall, prioritas etalase, dan fitur penarikan saldo instan."}
                 </p>
               </div>
             )}
 
+            {decisionType === "suspend" && (
+              <div className="space-y-3.5">
+                <div className="p-3.5 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-xs text-orange-800 dark:text-orange-300">
+                  <span className="font-bold">Penalti Suspend Toko: </span>
+                  Status Mall dan hak verifikasi toko akan dibekukan sementara. Penjual dapat melihat durasi penalti dan sisa waktu suspend di portalnya.
+                </div>
+
+                {/* Durasi Jam */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      Durasi Penalti Suspend (Min. 1 Jam) <span className="text-orange-500">*</span>
+                    </label>
+                    <span className="text-[11px] font-mono font-bold text-orange-600 dark:text-orange-400">
+                      {durationHours} Jam
+                    </span>
+                  </div>
+
+                  {/* Preset Cepat Durasi */}
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {QUICK_SUSPENSION_DURATIONS.map((preset) => (
+                      <button
+                        key={preset.hours}
+                        type="button"
+                        onClick={() => setDurationHours(preset.hours)}
+                        className={`text-[10px] px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
+                          durationHours === preset.hours
+                            ? "bg-orange-500 text-white border-orange-500 font-bold shadow-2xs"
+                            : "bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border-slate-200/60 dark:border-white/5"
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={durationHours}
+                      onChange={(e) =>
+                        setDurationHours(Math.max(1, parseInt(e.target.value) || 1))
+                      }
+                      className="w-28 px-3 py-2 text-xs font-mono font-bold rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 focus:outline-none focus:ring-2 focus:ring-orange-500 text-slate-900 dark:text-white"
+                    />
+                    <span className="text-xs text-slate-400">Jam penalti dihitung sejak disimpan</span>
+                  </div>
+
+                  {/* Live Preview Timestamp Selesai Penalti */}
+                  <div className="mt-2 p-2.5 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-slate-200/80 dark:border-white/10 text-[11px] flex items-center justify-between text-slate-600 dark:text-slate-300">
+                    <span>Ditangguhkan sampai:</span>
+                    <strong className="text-orange-600 dark:text-orange-400 font-bold font-mono">
+                      {new Date(Date.now() + (durationHours || 1) * 3600000).toLocaleString("id-ID", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </strong>
+                  </div>
+                </div>
+
+                {/* Alasan Suspend */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Alasan Suspend Toko <span className="text-orange-500">*</span>
+                  </label>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {PRESET_SUSPEND_REASONS.map((preset, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setRejectionReason(preset)}
+                        className="text-[10px] px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-white/5 transition-colors cursor-pointer text-left"
+                      >
+                        + {preset}
+                      </button>
+                    ))}
+                  </div>
+                  <textarea
+                    rows={3}
+                    value={rejectionReason}
+                    onChange={(e) => setRejectionReason(e.target.value)}
+                    placeholder="Ketik alasan suspend secara spesifik di sini..."
+                    className="w-full px-3.5 py-2.5 text-xs rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 focus:outline-none focus:ring-2 focus:ring-orange-500 text-slate-900 dark:text-white"
+                  />
+                </div>
+              </div>
+            )}
+
+            {decisionType === "revoke" && (
+              <div className="space-y-3">
+                <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-800 dark:text-rose-300">
+                  <span className="font-bold">Penghentian Fungsi Mall: </span>
+                  Status Mall resmi dan lencana verifikasi centang akan dicabut dari akun toko ini. Toko akan kembali menjadi toko perorangan biasa.
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Alasan Penghentian / Pencabutan Mall <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {PRESET_REVOKE_REASONS.map((preset, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setRejectionReason(preset)}
+                        className="text-[10px] px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-white/5 transition-colors cursor-pointer text-left"
+                      >
+                        + {preset}
+                      </button>
+                    ))}
+                  </div>
+                  <textarea
+                    rows={3}
+                    value={rejectionReason}
+                    onChange={(e) => setRejectionReason(e.target.value)}
+                    placeholder="Ketik alasan pencabutan status Mall di sini..."
+                    className="w-full px-3.5 py-2.5 text-xs rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 focus:outline-none focus:ring-2 focus:ring-rose-500 text-slate-900 dark:text-white"
+                  />
+                </div>
+              </div>
+            )}
+
             {decisionType === "reject" && (
-              <div className="space-y-3 mb-5">
+              <div className="space-y-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                     Alasan Penolakan <span className="text-rose-500">*</span>
@@ -1092,9 +1687,7 @@ export const SellerVerificationManagementView: React.FC<
                   <p className="text-[11px] text-slate-400 mb-2">
                     Alasan ini akan langsung tampil di notifikasi & portal penjual agar mereka tahu apa yang perlu diperbaiki.
                   </p>
-
-                  {/* Preset Alasan Cepat */}
-                  <div className="flex flex-wrap gap-1.5 mb-2.5">
+                  <div className="flex flex-wrap gap-1.5 mb-2">
                     {PRESET_REJECTION_REASONS.map((preset, idx) => (
                       <button
                         key={idx}
@@ -1106,45 +1699,44 @@ export const SellerVerificationManagementView: React.FC<
                       </button>
                     ))}
                   </div>
-
                   <textarea
                     rows={3}
                     value={rejectionReason}
                     onChange={(e) => setRejectionReason(e.target.value)}
                     placeholder="Ketik alasan penolakan spesifik di sini..."
-                    className="w-full px-3.5 py-2.5 text-xs rounded-xl bg-slate-50 dark:bg-[#0b132b]/50 border border-slate-200 dark:border-white/10 focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-slate-900 dark:text-white"
+                    className="w-full px-3.5 py-2.5 text-xs rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 focus:outline-none focus:ring-2 focus:ring-rose-500 text-slate-900 dark:text-white"
                   />
                 </div>
               </div>
             )}
 
             {decisionType === "pending" && (
-              <div className="space-y-3 mb-5">
+              <div className="space-y-3">
                 <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-800 dark:text-amber-300">
-                  Status verifikasi akan dikembalikan ke <strong>Menunggu Tinjauan</strong>. Anda dapat menyertakan catatan tambahan opsional di bawah ini.
+                  Status verifikasi akan dikembalikan ke <strong>Menunggu Tinjauan</strong>. Anda dapat menyertakan catatan tambahan opsional.
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Catatan Internal / Pesan ke Penjual (Opsional)
+                    Catatan Internal (Opsional)
                   </label>
                   <textarea
                     rows={2}
                     value={rejectionReason}
                     onChange={(e) => setRejectionReason(e.target.value)}
                     placeholder="Catatan peninjauan ulang..."
-                    className="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 dark:bg-[#0b132b]/50 border border-slate-200 dark:border-white/10 focus:outline-none focus:ring-2 focus:ring-amber-500/50 text-slate-900 dark:text-white"
+                    className="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-900 dark:text-white"
                   />
                 </div>
               </div>
             )}
 
-            {/* Tombol Simpan & Batal */}
-            <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-200/80 dark:border-white/10">
+            {/* Action Buttons */}
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-white/5">
               <button
                 type="button"
                 onClick={() => setIsDecisionModalOpen(false)}
                 disabled={isSubmittingDecision}
-                className="px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200/80 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer disabled:opacity-50"
+                className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 cursor-pointer disabled:opacity-50"
               >
                 Batal
               </button>
@@ -1153,12 +1745,14 @@ export const SellerVerificationManagementView: React.FC<
                 type="button"
                 onClick={handleSubmitDecision}
                 disabled={isSubmittingDecision}
-                className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold text-white shadow-2xs transition-all cursor-pointer disabled:opacity-50 ${
+                className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white shadow-md transition-all cursor-pointer disabled:opacity-50 ${
                   decisionType === "approve"
-                    ? "bg-emerald-600 hover:bg-emerald-700"
-                    : decisionType === "reject"
-                    ? "bg-rose-600 hover:bg-rose-700"
-                    : "bg-amber-600 hover:bg-amber-700"
+                    ? "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-950/20"
+                    : decisionType === "revoke" || decisionType === "reject"
+                    ? "bg-rose-600 hover:bg-rose-500 shadow-rose-950/20"
+                    : decisionType === "suspend"
+                    ? "bg-orange-600 hover:bg-orange-500 shadow-orange-950/20"
+                    : "bg-amber-600 hover:bg-amber-500 shadow-amber-950/20"
                 }`}
               >
                 {isSubmittingDecision ? (
@@ -1171,7 +1765,13 @@ export const SellerVerificationManagementView: React.FC<
                     <CheckIcon size={14} />
                     <span>
                       {decisionType === "approve"
-                        ? "Konfirmasi ACC"
+                        ? selectedSeller.verificationStatus === "suspended"
+                          ? "Aktifkan Kembali Mall"
+                          : "Konfirmasi ACC"
+                        : decisionType === "revoke"
+                        ? "Hentikan Status Mall"
+                        : decisionType === "suspend"
+                        ? "Terapkan Penalti Suspend"
                         : decisionType === "reject"
                         ? "Tolak Verifikasi"
                         : "Simpan Pending"}
@@ -1184,35 +1784,37 @@ export const SellerVerificationManagementView: React.FC<
         </div>
       )}
 
-      {/* 7. Modal Pembesar Foto Dokumen */}
+      {/* ========================================================================= */}
+      {/* 7. MODAL PRATINJAU PEMBESAR FOTO DOKUMEN (FULLSCREEN VIEWER) */}
+      {/* ========================================================================= */}
       {previewPhoto && (
         <div
-          className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md"
+          className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in"
           onClick={() => setPreviewPhoto(null)}
         >
           <div
-            className="relative max-w-4xl max-h-[90vh] bg-white dark:bg-[#111827] rounded-3xl p-4 shadow-2xl border border-white/10 flex flex-col items-center"
+            className="relative max-w-4xl max-h-[90vh] bg-white dark:bg-[#0c1220] rounded-3xl p-5 shadow-2xl border border-slate-200 dark:border-white/10 flex flex-col items-center"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="w-full flex items-center justify-between pb-3 mb-2 border-b border-slate-200 dark:border-white/10">
+            <div className="w-full flex items-center justify-between pb-3 mb-2 border-b border-slate-100 dark:border-white/10">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                 {previewPhoto.title}
               </h3>
               <button
                 type="button"
                 onClick={() => setPreviewPhoto(null)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10"
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
               >
                 <CloseIcon size={20} />
               </button>
             </div>
 
-            <div className="overflow-auto max-h-[75vh] flex items-center justify-center rounded-2xl bg-black/40">
+            <div className="overflow-auto max-h-[75vh] flex items-center justify-center rounded-2xl bg-black/40 p-2">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={previewPhoto.url}
                 alt={previewPhoto.title}
-                className="max-w-full max-h-[70vh] object-contain rounded-xl"
+                className="max-w-full max-h-[70vh] object-contain rounded-xl shadow-lg"
               />
             </div>
           </div>

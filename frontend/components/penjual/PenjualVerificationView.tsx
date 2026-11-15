@@ -248,6 +248,11 @@ export const PenjualVerificationView: React.FC<PenjualVerificationViewProps> = (
                 <CheckCircleIcon size={13} className="shrink-0" />
                 <span>Terverifikasi Resmi</span>
               </span>
+            ) : currentStatus === "suspended" ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/25">
+                <LockIcon size={13} className="shrink-0 text-orange-500" />
+                <span>Mall Ditangguhkan (Suspend)</span>
+              </span>
             ) : currentStatus === "pending" ? (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
                 <ClockIcon size={13} className="shrink-0" />
@@ -272,6 +277,66 @@ export const PenjualVerificationView: React.FC<PenjualVerificationViewProps> = (
       </div>
 
       {/* 2. Banner Kartu Status Aktif */}
+      {currentStatus === "suspended" && (
+        <div className="p-5 sm:p-6 rounded-3xl bg-orange-50/90 dark:bg-orange-950/25 border border-orange-200/90 dark:border-orange-800/50 shadow-xs">
+          <div className="flex items-start gap-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-orange-500/20 text-orange-600 dark:text-orange-400">
+              <LockIcon size={22} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-sm sm:text-base font-bold text-orange-900 dark:text-orange-200">
+                  Fungsi Mall Ditangguhkan Sementara (Suspended)
+                </h3>
+                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-orange-500/20 text-orange-800 dark:text-orange-300">
+                  Penalti: {sellerProfile?.mallSuspensionHours || "-"} Jam
+                </span>
+              </div>
+              <p className="text-xs text-orange-800/90 dark:text-orange-300/90 mt-1.5 leading-relaxed">
+                Status mitra Mall toko Anda sedang dinonaktifkan sementara oleh Administrator karena:{" "}
+                <span className="font-bold underline">
+                  {sellerProfile?.mallSuspensionReason || "Kena laporan dan di suspend sementara untuk proses peninjauan."}
+                </span>
+              </p>
+
+              <div className="mt-3.5 p-3 rounded-2xl bg-white/80 dark:bg-black/30 border border-orange-200/60 dark:border-white/10 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div>
+                  <span className="text-[10px] text-slate-400 block">Ditangguhkan Hingga:</span>
+                  <span className="font-bold font-mono text-orange-700 dark:text-orange-300">
+                    {formatDateTime(sellerProfile?.mallSuspendedUntil)}
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 italic">
+                  Lencana Mall & keistimewaan akan dipulihkan otomatis setelah masa penalti berakhir.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {currentStatus === "unverified" && sellerProfile?.verificationRejectionReason && (
+        <div className="p-5 sm:p-6 rounded-3xl bg-rose-50/80 dark:bg-rose-950/20 border border-rose-200/80 dark:border-rose-800/40 shadow-xs">
+          <div className="flex items-start gap-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-rose-500/20 text-rose-600 dark:text-rose-400">
+              <LockIcon size={22} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="text-sm sm:text-base font-bold text-rose-900 dark:text-rose-200">
+                Status Verifikasi Mall Telah Dihentikan
+              </h3>
+              <p className="text-xs text-rose-800/90 dark:text-rose-300/90 mt-1">
+                Catatan Administrator:{" "}
+                <span className="font-semibold">{sellerProfile.verificationRejectionReason}</span>
+              </p>
+              <p className="text-[11px] text-rose-700/80 dark:text-rose-300/70 mt-2">
+                Jika kontrak kemitraan telah berakhir atau Anda telah menyelesaikan kendala terkait, silakan ajukan perpanjangan kontrak atau verifikasi ulang melalui formulir di bawah ini.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {currentStatus === "pending" && (
         <div className="p-5 sm:p-6 rounded-3xl bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-800/40 shadow-xs">
           <div className="flex items-start gap-4">

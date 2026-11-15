@@ -1,7 +1,12 @@
 import { Request, Response } from "express";
 import { db } from "../config/database";
 
-export type SellerVerificationStatus = "unverified" | "pending" | "verified" | "rejected";
+export type SellerVerificationStatus =
+  | "unverified"
+  | "pending"
+  | "verified"
+  | "rejected"
+  | "suspended";
 
 export type PayoutAccountType = "bank" | "wallet";
 export type PayoutMethod = "preset" | "manual";
@@ -66,6 +71,13 @@ export interface SellerProfileData {
   verificationSubmittedAt?: string | null;
   verificationData?: SellerVerificationPayload | null;
   verificationRejectionReason?: string | null;
+  mallSuspendedUntil?: string | null;
+  mallSuspensionReason?: string | null;
+  mallSuspensionHours?: number | null;
+  isMallSuspended?: boolean;
+  isBalanceFrozen?: boolean;
+  balanceFreezeReason?: string | null;
+  balanceFrozenAt?: string | null;
   createdAt: string;
   stats: {
     totalProducts: number;
@@ -97,6 +109,8 @@ export class SellerController {
       const stmt = db.prepare(`
         SELECT id, name, username, email, role, status, is_store_open, store_balance,
                verification_status, verification_submitted_at, verification_data, verification_rejection_reason,
+               mall_suspended_until, mall_suspension_reason, mall_suspension_hours,
+               is_balance_frozen, balance_freeze_reason, balance_frozen_at,
                created_at
         FROM users
         WHERE id = ? AND role = 'penjual'
@@ -115,6 +129,12 @@ export class SellerController {
         verification_submitted_at: string | null;
         verification_data: string | null;
         verification_rejection_reason: string | null;
+        mall_suspended_until: string | null;
+        mall_suspension_reason: string | null;
+        mall_suspension_hours: number | null;
+        is_balance_frozen: number | null;
+        balance_freeze_reason: string | null;
+        balance_frozen_at: string | null;
         created_at: string;
       } | undefined;
 
@@ -134,6 +154,12 @@ export class SellerController {
           parsedVerificationData = null;
         }
       }
+
+      const isMallSuspended = Boolean(
+        row.verification_status === "suspended" &&
+        row.mall_suspended_until &&
+        new Date(row.mall_suspended_until).getTime() > Date.now()
+      );
 
       // Hitung metrik realtime sesungguhnya (tanpa data dummy)
       const totalProducts = 0;
@@ -157,6 +183,13 @@ export class SellerController {
         verificationSubmittedAt: row.verification_submitted_at,
         verificationData: parsedVerificationData,
         verificationRejectionReason: row.verification_rejection_reason,
+        mallSuspendedUntil: row.mall_suspended_until,
+        mallSuspensionReason: row.mall_suspension_reason,
+        mallSuspensionHours: row.mall_suspension_hours,
+        isMallSuspended,
+        isBalanceFrozen: row.is_balance_frozen === 1,
+        balanceFreezeReason: row.balance_freeze_reason,
+        balanceFrozenAt: row.balance_frozen_at,
         createdAt: row.created_at,
         stats: {
           totalProducts,
@@ -198,7 +231,9 @@ export class SellerController {
       }
 
       const stmt = db.prepare(`
-        SELECT verification_status, verification_submitted_at, verification_data, verification_rejection_reason
+        SELECT verification_status, verification_submitted_at, verification_data,
+               verification_rejection_reason, mall_suspended_until, mall_suspension_reason,
+               mall_suspension_hours
         FROM users
         WHERE id = ? AND role = 'penjual'
       `);
@@ -208,6 +243,9 @@ export class SellerController {
         verification_submitted_at: string | null;
         verification_data: string | null;
         verification_rejection_reason: string | null;
+        mall_suspended_until: string | null;
+        mall_suspension_reason: string | null;
+        mall_suspension_hours: number | null;
       } | undefined;
 
       if (!row) {
@@ -227,12 +265,22 @@ export class SellerController {
         }
       }
 
+      const isMallSuspended = Boolean(
+        row.verification_status === "suspended" &&
+        row.mall_suspended_until &&
+        new Date(row.mall_suspended_until).getTime() > Date.now()
+      );
+
       res.json({
         success: true,
         verificationStatus: row.verification_status || "unverified",
         submittedAt: row.verification_submitted_at,
         data: parsedData,
         rejectionReason: row.verification_rejection_reason,
+        mallSuspendedUntil: row.mall_suspended_until,
+        mallSuspensionReason: row.mall_suspension_reason,
+        mallSuspensionHours: row.mall_suspension_hours,
+        isMallSuspended,
       });
     } catch (error) {
       console.error("[SellerController.getVerification] Error:", error);
@@ -845,20 +893,32 @@ export class SellerController {
         return;
       }
 
-      // 4. Cek Saldo Toko Terkini
+      // 4. Cek Saldo Toko Terkini & Status Pembekuan Saldo
       const userStmt = db.prepare(`
-        SELECT id, name, store_balance FROM users WHERE id = ? AND role = 'penjual'
+        SELECT id, name, store_balance, is_balance_frozen, balance_freeze_reason
+        FROM users
+        WHERE id = ? AND role = 'penjual'
       `);
       const seller = userStmt.get(sellerId) as unknown as {
         id: number;
         name: string;
         store_balance: number | null;
+        is_balance_frozen: number | null;
+        balance_freeze_reason: string | null;
       } | undefined;
 
       if (!seller) {
         res.status(404).json({
           success: false,
           message: "Data akun penjual tidak ditemukan.",
+        });
+        return;
+      }
+
+      if (seller.is_balance_frozen === 1) {
+        res.status(403).json({
+          success: false,
+          message: `Saldo toko Anda saat ini sedang dibekukan oleh Admin (${seller.balance_freeze_reason || "Terindikasi pelanggaran / kecurangan"}). Penarikan saldo dinonaktifkan sementara demi keamanan akun.`,
         });
         return;
       }

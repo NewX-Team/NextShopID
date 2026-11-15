@@ -47,7 +47,14 @@ export interface AdminUpdateRoleResponse {
   };
 }
 
-export type VerificationDecision = "approve" | "reject" | "pending";
+export type VerificationDecision =
+  | "approve"
+  | "reject"
+  | "pending"
+  | "revoke"
+  | "stop"
+  | "suspend"
+  | "reactivate";
 
 export interface AdminSellerVerificationItem {
   id: number;
@@ -59,7 +66,7 @@ export interface AdminSellerVerificationItem {
   suspensionReason?: string | null;
   isStoreOpen: boolean;
   storeBalance: number;
-  verificationStatus: "unverified" | "pending" | "verified" | "rejected";
+  verificationStatus: "unverified" | "pending" | "verified" | "rejected" | "suspended";
   verificationSubmittedAt: string | null;
   verificationData: {
     ownerName?: string;
@@ -73,6 +80,12 @@ export interface AdminSellerVerificationItem {
     notes?: string;
   } | null;
   verificationRejectionReason: string | null;
+  mallSuspendedUntil?: string | null;
+  mallSuspensionReason?: string | null;
+  mallSuspensionHours?: number | null;
+  isBalanceFrozen?: boolean;
+  balanceFreezeReason?: string | null;
+  balanceFrozenAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -88,7 +101,13 @@ export interface AdminSellerBalanceItem {
   isStoreOpen: boolean;
   storeBalance: number;
   buyerBalance: number;
-  verificationStatus: "unverified" | "pending" | "verified" | "rejected";
+  verificationStatus: "unverified" | "pending" | "verified" | "rejected" | "suspended";
+  mallSuspendedUntil?: string | null;
+  mallSuspensionReason?: string | null;
+  mallSuspensionHours?: number | null;
+  isBalanceFrozen?: boolean;
+  balanceFreezeReason?: string | null;
+  balanceFrozenAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -100,6 +119,8 @@ export interface AdminSellerBalanceStats {
   activeBalanceCount: number;
   zeroBalanceCount: number;
   openStoreCount: number;
+  frozenSellersCount?: number;
+  totalFrozenBalance?: number;
 }
 
 export interface AdminGetSellerBalancesResponse {
@@ -148,6 +169,7 @@ export interface AdminVerificationStats {
   pendingCount: number;
   verifiedCount: number;
   rejectedCount: number;
+  suspendedCount?: number;
   unverifiedCount: number;
 }
 
@@ -646,7 +668,7 @@ export const adminService = {
   },
 
   /**
-   * Mengatur keputusan verifikasi penjual (ACC, Tolak dengan alasan, atau Pending)
+   * Mengatur keputusan verifikasi penjual (ACC, Tolak dengan alasan, Pending, Cabut Mall, Suspend dengan durasi jam, atau Aktifkan)
    * PATCH /api/admin/verifications/:id/decision
    */
   async updateVerificationDecision(
@@ -655,6 +677,7 @@ export const adminService = {
     payload: {
       decision: VerificationDecision;
       reason?: string;
+      durationHours?: number;
     }
   ): Promise<AdminUpdateVerificationDecisionResponse> {
     try {
@@ -824,6 +847,50 @@ export const adminService = {
         success: false,
         message: "Gagal terhubung ke backend server.",
         data: [],
+      };
+    }
+  },
+
+  /**
+   * Membekukan atau membuka pembekuan saldo akun penjual oleh Administrator
+   * PATCH /api/admin/sellers/:id/balance/freeze
+   */
+  async toggleSellerBalanceFreeze(
+    token: string,
+    sellerId: number,
+    payload: {
+      action: "freeze" | "unfreeze";
+      reason?: string;
+    }
+  ): Promise<{
+    success: boolean;
+    message?: string;
+    seller?: {
+      id: number;
+      name: string;
+      storeBalance: number;
+      isBalanceFrozen: boolean;
+      balanceFreezeReason?: string | null;
+      balanceFrozenAt?: string | null;
+    };
+  }> {
+    try {
+      const response = await fetch(`${API_URL}/admin/sellers/${sellerId}/balance/freeze`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error("[adminService.toggleSellerBalanceFreeze] Error:", error);
+      return {
+        success: false,
+        message: "Gagal memperbarui status pembekuan saldo penjual.",
       };
     }
   },

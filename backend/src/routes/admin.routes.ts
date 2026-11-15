@@ -26,6 +26,7 @@ router.patch("/verifications/:id/decision", adminController.updateVerificationDe
 router.get("/sellers/balances", adminController.getSellerBalances.bind(adminController));
 router.post("/sellers/:id/balance/topup", adminController.topupSellerBalance.bind(adminController));
 router.get("/sellers/:id/balance/history", adminController.getSellerBalanceHistory.bind(adminController));
+router.patch("/sellers/:id/balance/freeze", adminController.toggleSellerBalanceFreeze.bind(adminController));
 
 // Finansial - Persetujuan Penarikan Saldo Penjual (WD)
 router.get("/sellers/withdrawals", adminController.getSellerWithdrawals.bind(adminController));

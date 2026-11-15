@@ -20,6 +20,7 @@ import {
   BadgeCheckIcon,
   ArrowRightIcon,
   ShieldIcon,
+  LockIcon,
 } from "@/components/ui/icons";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -132,6 +133,21 @@ export const SellerBalanceManagementView: React.FC<SellerBalanceManagementViewPr
   const [historyTargetSeller, setHistoryTargetSeller] = useState<AdminSellerBalanceItem | null>(null);
   const [mutationsHistory, setMutationsHistory] = useState<AdminBalanceMutationItem[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+
+  // State Modal Freeze / Unfreeze Saldo Penjual
+  const [freezeTargetSeller, setFreezeTargetSeller] = useState<AdminSellerBalanceItem | null>(null);
+  const [isFreezeModalOpen, setIsFreezeModalOpen] = useState<boolean>(false);
+  const [freezeAction, setFreezeAction] = useState<"freeze" | "unfreeze">("freeze");
+  const [freezeReason, setFreezeReason] = useState<string>("");
+  const [isSubmittingFreeze, setIsSubmittingFreeze] = useState<boolean>(false);
+
+  // Preset alasan pembekuan saldo toko
+  const PRESET_FREEZE_REASONS = [
+    "Terjadi kecurangan transaksi / manipulasi saldo",
+    "Tindakan ilegal dan sengketa kepemilikan akun",
+    "Laporan penipuan pesanan pembeli dalam proses investigasi",
+    "Permintaan investigasi resmi dari aparat berwenang",
+  ];
 
   // Format mata uang Rupiah
   const formatRupiah = (amount: number): string => {
@@ -452,6 +468,95 @@ export const SellerBalanceManagementView: React.FC<SellerBalanceManagementViewPr
       });
     } finally {
       setIsLoadingHistory(false);
+    }
+  };
+
+  // ==========================================
+  // HANDLER FREEZE / UNFREEZE SALDO PENJUAL
+  // ==========================================
+  const handleOpenFreezeModal = (
+    seller: AdminSellerBalanceItem,
+    action: "freeze" | "unfreeze"
+  ) => {
+    setFreezeTargetSeller(seller);
+    setFreezeAction(action);
+    setFreezeReason(
+      action === "freeze"
+        ? seller.balanceFreezeReason || "Terjadi kecurangan transaksi / manipulasi saldo"
+        : ""
+    );
+    setFeedback(null);
+    setIsFreezeModalOpen(true);
+  };
+
+  const handleSubmitFreeze = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !freezeTargetSeller) return;
+
+    if (freezeAction === "freeze" && !freezeReason.trim()) {
+      setFeedback({
+        type: "error",
+        text: "Alasan pembekuan saldo wajib diisi (misal: terjadi kecurangan transaksi, tindakan ilegal, sengketa, dll).",
+      });
+      return;
+    }
+
+    setIsSubmittingFreeze(true);
+    setFeedback(null);
+
+    try {
+      const res = await adminService.toggleSellerBalanceFreeze(
+        token,
+        freezeTargetSeller.id,
+        {
+          action: freezeAction,
+          reason: freezeReason.trim(),
+        }
+      );
+
+      if (res.success && res.seller) {
+        setFeedback({
+          type: "success",
+          text:
+            res.message ||
+            (freezeAction === "freeze"
+              ? `Saldo toko ${freezeTargetSeller.name} berhasil dibekukan.`
+              : `Pembekuan saldo toko ${freezeTargetSeller.name} berhasil dibuka kembali.`),
+        });
+
+        // Update state lokal
+        setSellers((prev) =>
+          prev.map((s) =>
+            s.id === res.seller!.id
+              ? {
+                  ...s,
+                  isBalanceFrozen: res.seller!.isBalanceFrozen,
+                  balanceFreezeReason: res.seller!.balanceFreezeReason,
+                  balanceFrozenAt: res.seller!.balanceFrozenAt,
+                }
+              : s
+          )
+        );
+
+        fetchBalances(true);
+
+        setIsFreezeModalOpen(false);
+        setFreezeTargetSeller(null);
+        setFreezeReason("");
+      } else {
+        setFeedback({
+          type: "error",
+          text: res.message || "Gagal memperbarui status pembekuan saldo.",
+        });
+      }
+    } catch (err) {
+      console.error("[handleSubmitFreeze] Error:", err);
+      setFeedback({
+        type: "error",
+        text: "Terjadi gangguan saat memproses status pembekuan saldo.",
+      });
+    } finally {
+      setIsSubmittingFreeze(false);
     }
   };
 
@@ -918,7 +1023,7 @@ export const SellerBalanceManagementView: React.FC<SellerBalanceManagementViewPr
       {activeSection === "balances" && (
         <div className="space-y-6">
           {/* Kartu Metrik Saldo Toko */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <div className="p-5 rounded-3xl bg-white dark:bg-[#0c1220] border border-slate-200/90 dark:border-white/10 shadow-xs flex flex-col justify-between">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
@@ -976,6 +1081,26 @@ export const SellerBalanceManagementView: React.FC<SellerBalanceManagementViewPr
               </div>
             </div>
 
+            {/* Metrik Saldo Dibekukan */}
+            <div className="p-5 rounded-3xl bg-white dark:bg-[#0c1220] border border-slate-200/90 dark:border-white/10 shadow-xs flex flex-col justify-between">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-rose-500 dark:text-rose-400">
+                  Saldo Dibekukan
+                </span>
+                <div className="p-2 rounded-xl bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800">
+                  <LockIcon size={18} />
+                </div>
+              </div>
+              <div>
+                <div className="text-2xl font-black tracking-tight text-rose-600 dark:text-rose-400">
+                  {stats.frozenSellersCount || 0} <span className="text-xs font-semibold text-slate-400">Toko</span>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1 font-mono">
+                  Total: {formatRupiah(stats.totalFrozenBalance || 0)}
+                </p>
+              </div>
+            </div>
+
             <div className="p-5 rounded-3xl bg-white dark:bg-[#0c1220] border border-slate-200/90 dark:border-white/10 shadow-xs flex flex-col justify-between">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
@@ -1018,6 +1143,7 @@ export const SellerBalanceManagementView: React.FC<SellerBalanceManagementViewPr
                 <option value="all">Semua Kondisi Saldo</option>
                 <option value="has_balance">Hanya Saldo &gt; 0</option>
                 <option value="zero_balance">Saldo Rp 0</option>
+                <option value="frozen">Saldo Dibekukan ({stats.frozenSellersCount || 0})</option>
               </select>
 
               <select
@@ -1069,7 +1195,8 @@ export const SellerBalanceManagementView: React.FC<SellerBalanceManagementViewPr
                     <tr>
                       <th scope="col" className="px-4 py-3.5">Identitas Toko</th>
                       <th scope="col" className="px-4 py-3.5">Status Toko</th>
-                      <th scope="col" className="px-4 py-3.5 text-right">Saldo Toko Aktif</th>
+                      <th scope="col" className="px-4 py-3.5">Status Saldo</th>
+                      <th scope="col" className="px-4 py-3.5 text-right">Saldo Toko</th>
                       <th scope="col" className="px-4 py-3.5 text-center">Aksi Administrator</th>
                     </tr>
                   </thead>
@@ -1122,14 +1249,70 @@ export const SellerBalanceManagementView: React.FC<SellerBalanceManagementViewPr
                           </span>
                         </td>
 
+                        <td className="px-4 py-4">
+                          {seller.isBalanceFrozen ? (
+                            <div className="space-y-0.5">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30">
+                                <LockIcon size={10} />
+                                <span>Dibekukan</span>
+                              </span>
+                              {seller.balanceFreezeReason && (
+                                <p
+                                  className="text-[10px] text-rose-500 dark:text-rose-400 font-medium truncate max-w-[150px]"
+                                  title={seller.balanceFreezeReason}
+                                >
+                                  {seller.balanceFreezeReason}
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                              <CheckCircleIcon size={10} />
+                              <span>Normal</span>
+                            </span>
+                          )}
+                        </td>
+
                         <td className="px-4 py-4 text-right">
-                          <div className="font-mono font-black text-sm text-emerald-600 dark:text-emerald-400">
+                          <div
+                            className={`font-mono font-black text-sm ${
+                              seller.isBalanceFrozen
+                                ? "text-rose-600 dark:text-rose-400 line-through"
+                                : "text-emerald-600 dark:text-emerald-400"
+                            }`}
+                          >
                             {formatRupiah(seller.storeBalance)}
                           </div>
+                          {seller.isBalanceFrozen && (
+                            <span className="text-[10px] text-rose-500 font-semibold">Terkunci</span>
+                          )}
                         </td>
 
                         <td className="px-4 py-4 text-center">
                           <div className="flex items-center justify-center gap-2">
+                            {/* Tombol Bekukan / Buka Pembekuan Saldo */}
+                            {seller.isBalanceFrozen ? (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenFreezeModal(seller, "unfreeze")}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30 font-semibold text-xs transition-colors cursor-pointer"
+                                title="Buka pembekuan saldo toko"
+                              >
+                                <LockIcon size={12} className="text-rose-500" />
+                                <span>Buka Pembekuan</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenFreezeModal(seller, "freeze")}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-rose-200 dark:border-rose-900/50 hover:bg-rose-50 dark:hover:bg-rose-950/20 text-rose-600 dark:text-rose-400 font-semibold text-xs transition-colors cursor-pointer"
+                                title="Bekukan saldo toko jika terjadi kecurangan atau sengketa"
+                              >
+                                <LockIcon size={12} />
+                                <span>Bekukan Saldo</span>
+                              </button>
+                            )}
+
                             <button
                               type="button"
                               onClick={() => handleOpenTopup(seller)}
@@ -1663,6 +1846,173 @@ export const SellerBalanceManagementView: React.FC<SellerBalanceManagementViewPr
                 Tutup
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 6: BEKUKAN / BUKA PEMBEKUAN SALDO PENJUAL */}
+      {/* ========================================================================= */}
+      {isFreezeModalOpen && freezeTargetSeller && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-lg rounded-3xl bg-white dark:bg-[#0c1220] border border-slate-200 dark:border-white/10 shadow-2xl p-6 sm:p-7 space-y-5">
+            {/* Header Modal */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-white/5">
+              <div className="flex items-center gap-2.5">
+                <div
+                  className={`p-2 rounded-xl ${
+                    freezeAction === "freeze"
+                      ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
+                      : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                  }`}
+                >
+                  <LockIcon size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                    {freezeAction === "freeze"
+                      ? "Bekukan Saldo Toko Penjual"
+                      : "Buka Pembekuan Saldo Toko"}
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    {freezeTargetSeller.name} (@{freezeTargetSeller.username}) • Saldo:{" "}
+                    <strong className="text-slate-700 dark:text-slate-200 font-mono">
+                      {formatRupiah(freezeTargetSeller.storeBalance)}
+                    </strong>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsFreezeModalOpen(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
+              >
+                <CloseIcon size={18} />
+              </button>
+            </div>
+
+            {/* Form Pembekuan Saldo */}
+            <form onSubmit={handleSubmitFreeze} className="space-y-4">
+              {freezeAction === "freeze" ? (
+                <>
+                  <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/25 text-xs text-rose-800 dark:text-rose-300 space-y-1">
+                    <p className="font-bold flex items-center gap-1.5">
+                      <AlertCircleIcon size={15} className="shrink-0 text-rose-500" />
+                      <span>Peringatan Keamanan Platform</span>
+                    </p>
+                    <p className="leading-relaxed">
+                      Saldo toko akan <strong>dibekukan seketika</strong>. Penjual <strong>TIDAK DAPAT</strong> melakukan penarikan saldo (WD) hingga status saldo dipulihkan kembali oleh administrator.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Alasan Pembekuan Saldo <span className="text-rose-500">*</span>
+                    </label>
+                    <p className="text-[11px] text-slate-400 mb-2">
+                      Pilih template alasan cepat atau ketik secara terperinci alasan pembekuan saldo toko:
+                    </p>
+
+                    {/* Preset Template Alasan */}
+                    <div className="flex flex-wrap gap-1.5 mb-2.5">
+                      {PRESET_FREEZE_REASONS.map((preset, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setFreezeReason(preset)}
+                          className="text-[10px] px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-white/5 transition-colors cursor-pointer text-left"
+                        >
+                          + {preset}
+                        </button>
+                      ))}
+                    </div>
+
+                    <textarea
+                      rows={3}
+                      required
+                      value={freezeReason}
+                      onChange={(e) => setFreezeReason(e.target.value)}
+                      placeholder="Ketik alasan pembekuan saldo secara spesifik di sini..."
+                      className="w-full px-3.5 py-2.5 text-xs rounded-xl bg-slate-50 dark:bg-[#0b132b]/50 border border-slate-200 dark:border-white/10 focus:outline-none focus:ring-2 focus:ring-rose-500/50 text-slate-900 dark:text-white"
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-xs text-emerald-800 dark:text-emerald-300 space-y-1">
+                    <p className="font-bold flex items-center gap-1.5">
+                      <CheckCircleIcon size={15} className="shrink-0 text-emerald-500" />
+                      <span>Pemulihan Hak Penarikan Saldo</span>
+                    </p>
+                    <p className="leading-relaxed">
+                      Dengan membuka pembekuan, status saldo akan kembali normal dan penjual dapat kembali mengajukan penarikan dana ke rekening atau dompet digital mereka.
+                    </p>
+                  </div>
+
+                  {freezeTargetSeller.balanceFreezeReason && (
+                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 text-xs">
+                      <span className="text-slate-400 font-bold block mb-0.5">
+                        Alasan Pembekuan Sebelumnya:
+                      </span>
+                      <p className="text-slate-800 dark:text-slate-200 font-medium italic">
+                        &quot;{freezeTargetSeller.balanceFreezeReason}&quot;
+                      </p>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Catatan Audit Pemulihan (Opsional)
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={freezeReason}
+                      onChange={(e) => setFreezeReason(e.target.value)}
+                      placeholder="Contoh: Investigasi sengketa selesai, saldo dinyatakan aman untuk dicairkan."
+                      className="w-full px-3.5 py-2 text-xs rounded-xl bg-slate-50 dark:bg-[#0b132b]/50 border border-slate-200 dark:border-white/10 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-slate-900 dark:text-white"
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-white/5">
+                <button
+                  type="button"
+                  onClick={() => setIsFreezeModalOpen(false)}
+                  disabled={isSubmittingFreeze}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 cursor-pointer disabled:opacity-50"
+                >
+                  Batal
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isSubmittingFreeze || (freezeAction === "freeze" && !freezeReason.trim())}
+                  className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white shadow-md transition-all cursor-pointer disabled:opacity-50 ${
+                    freezeAction === "freeze"
+                      ? "bg-rose-600 hover:bg-rose-500 shadow-rose-950/20"
+                      : "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-950/20"
+                  }`}
+                >
+                  {isSubmittingFreeze ? (
+                    <>
+                      <div className="h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Menyimpan...</span>
+                    </>
+                  ) : (
+                    <>
+                      <LockIcon size={13} />
+                      <span>
+                        {freezeAction === "freeze"
+                          ? "Konfirmasi & Bekukan Saldo"
+                          : "Konfirmasi Buka Pembekuan"}
+                      </span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

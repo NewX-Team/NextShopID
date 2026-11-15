@@ -1,6 +1,11 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
-export type SellerVerificationStatus = "unverified" | "pending" | "verified" | "rejected";
+export type SellerVerificationStatus =
+  | "unverified"
+  | "pending"
+  | "verified"
+  | "rejected"
+  | "suspended";
 
 export interface SellerVerificationPayload {
   ownerName: string;
@@ -37,6 +42,13 @@ export interface SellerProfile {
   verificationSubmittedAt?: string | null;
   verificationData?: SellerVerificationPayload | null;
   verificationRejectionReason?: string | null;
+  mallSuspendedUntil?: string | null;
+  mallSuspensionReason?: string | null;
+  mallSuspensionHours?: number | null;
+  isMallSuspended?: boolean;
+  isBalanceFrozen?: boolean;
+  balanceFreezeReason?: string | null;
+  balanceFrozenAt?: string | null;
   createdAt: string;
   stats: SellerStats;
 }
@@ -60,6 +72,10 @@ export interface SellerVerificationResponse {
   submittedAt?: string;
   data?: SellerVerificationPayload | null;
   rejectionReason?: string | null;
+  mallSuspendedUntil?: string | null;
+  mallSuspensionReason?: string | null;
+  mallSuspensionHours?: number | null;
+  isMallSuspended?: boolean;
 }
 
 export type PayoutAccountType = "bank" | "wallet";

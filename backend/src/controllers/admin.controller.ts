@@ -831,6 +831,7 @@ export class AdminController {
           SUM(CASE WHEN verification_status = 'pending' THEN 1 ELSE 0 END) as pendingCount,
           SUM(CASE WHEN verification_status = 'verified' THEN 1 ELSE 0 END) as verifiedCount,
           SUM(CASE WHEN verification_status = 'rejected' THEN 1 ELSE 0 END) as rejectedCount,
+          SUM(CASE WHEN verification_status = 'suspended' THEN 1 ELSE 0 END) as suspendedCount,
           SUM(CASE WHEN verification_status = 'unverified' OR verification_status IS NULL THEN 1 ELSE 0 END) as unverifiedCount
         FROM users
         WHERE role = 'penjual'
@@ -841,6 +842,7 @@ export class AdminController {
         pendingCount: number;
         verifiedCount: number;
         rejectedCount: number;
+        suspendedCount: number;
         unverifiedCount: number;
       };
 
@@ -857,7 +859,7 @@ export class AdminController {
       if (statusFilter && statusFilter !== "all") {
         if (statusFilter === "unverified") {
           conditions.push("(verification_status = 'unverified' OR verification_status IS NULL)");
-        } else if (["pending", "verified", "rejected"].includes(statusFilter)) {
+        } else if (["pending", "verified", "rejected", "suspended"].includes(statusFilter)) {
           conditions.push("verification_status = ?");
           params.push(statusFilter);
         }
@@ -879,7 +881,10 @@ export class AdminController {
           id, name, username, email, role, status, suspension_reason,
           is_store_open, store_balance, verification_status,
           verification_submitted_at, verification_data,
-          verification_rejection_reason, created_at, updated_at
+          verification_rejection_reason, mall_suspended_until,
+          mall_suspension_reason, mall_suspension_hours,
+          is_balance_frozen, balance_freeze_reason, balance_frozen_at,
+          created_at, updated_at
         FROM users
         ${whereClause}
         ${orderBy}
@@ -900,6 +905,12 @@ export class AdminController {
         verification_submitted_at: string | null;
         verification_data: string | null;
         verification_rejection_reason: string | null;
+        mall_suspended_until: string | null;
+        mall_suspension_reason: string | null;
+        mall_suspension_hours: number | null;
+        is_balance_frozen: number | null;
+        balance_freeze_reason: string | null;
+        balance_frozen_at: string | null;
         created_at: string;
         updated_at: string;
       }>;
@@ -928,6 +939,12 @@ export class AdminController {
           verificationSubmittedAt: r.verification_submitted_at,
           verificationData: parsedData,
           verificationRejectionReason: r.verification_rejection_reason,
+          mallSuspendedUntil: r.mall_suspended_until,
+          mallSuspensionReason: r.mall_suspension_reason,
+          mallSuspensionHours: r.mall_suspension_hours,
+          isBalanceFrozen: r.is_balance_frozen === 1,
+          balanceFreezeReason: r.balance_freeze_reason,
+          balanceFrozenAt: r.balance_frozen_at,
           createdAt: r.created_at,
           updatedAt: r.updated_at,
         };
@@ -942,6 +959,7 @@ export class AdminController {
           pendingCount: statsResult.pendingCount || 0,
           verifiedCount: statsResult.verifiedCount || 0,
           rejectedCount: statsResult.rejectedCount || 0,
+          suspendedCount: statsResult.suspendedCount || 0,
           unverifiedCount: statsResult.unverifiedCount || 0,
         },
       });
@@ -969,11 +987,21 @@ export class AdminController {
         return;
       }
 
-      const { decision, reason } = req.body;
-      if (!decision || !["approve", "reject", "pending"].includes(decision)) {
+      const { decision, reason, durationHours } = req.body;
+      const validDecisions = [
+        "approve",
+        "reject",
+        "pending",
+        "revoke",
+        "stop",
+        "suspend",
+        "reactivate",
+      ];
+      if (!decision || !validDecisions.includes(decision)) {
         res.status(400).json({
           success: false,
-          message: "Keputusan tidak valid. Pilihan yang diperbolehkan: 'approve', 'reject', atau 'pending'.",
+          message:
+            "Keputusan tidak valid. Pilihan yang diperbolehkan: 'approve', 'reject', 'pending', 'revoke' (atau 'stop'), 'suspend', atau 'reactivate'.",
         });
         return;
       }
@@ -992,14 +1020,18 @@ export class AdminController {
 
       let newStatus = "unverified";
       let newReason: string | null = null;
+      let mallSuspendedUntil: string | null = null;
+      let mallSuspensionReason: string | null = null;
+      let mallSuspensionHours: number | null = null;
       let message = "";
+
+      const trimmedReason = typeof reason === "string" ? reason.trim() : "";
 
       if (decision === "approve") {
         newStatus = "verified";
         newReason = null;
-        message = `Toko '${current.name}' berhasil disetujui (ACC). Lencana 'Official Verified Merchant' telah aktif.`;
+        message = `Toko '${current.name}' berhasil disetujui (ACC). Lencana 'Official Verified Merchant' dan status Mall telah aktif.`;
       } else if (decision === "reject") {
-        const trimmedReason = typeof reason === "string" ? reason.trim() : "";
         if (!trimmedReason) {
           res.status(400).json({
             success: false,
@@ -1012,19 +1044,72 @@ export class AdminController {
         message = `Pengajuan verifikasi toko '${current.name}' telah ditolak dengan alasan: "${trimmedReason}".`;
       } else if (decision === "pending") {
         newStatus = "pending";
-        newReason = typeof reason === "string" && reason.trim() ? reason.trim() : null;
+        newReason = trimmedReason || null;
         message = `Status verifikasi toko '${current.name}' berhasil diatur ke 'Menunggu Tinjauan' (Pending).`;
+      } else if (decision === "revoke" || decision === "stop") {
+        if (!trimmedReason) {
+          res.status(400).json({
+            success: false,
+            message:
+              "Alasan penghentian fungsi Mall wajib diisi (misal: kontrak telah berakhir silahkan perpanjang kontrak, toko melanggar pedoman, dll).",
+          });
+          return;
+        }
+        newStatus = "unverified";
+        newReason = trimmedReason;
+        message = `Fungsi Mall dan verifikasi resmi toko '${current.name}' telah dihentikan. Alasan: "${trimmedReason}".`;
+      } else if (decision === "suspend") {
+        if (!trimmedReason) {
+          res.status(400).json({
+            success: false,
+            message:
+              "Alasan penangguhan/suspend sementara wajib diisi (misal: kena laporan pelanggaran, sengketa transaksi, dll).",
+          });
+          return;
+        }
+
+        const hours = Number(durationHours);
+        if (!hours || isNaN(hours) || hours < 1) {
+          res.status(400).json({
+            success: false,
+            message:
+              "Durasi penalti suspend wajib diisi minimal 1 jam (dalam format angka jam).",
+          });
+          return;
+        }
+
+        const roundedHours = Math.round(hours);
+        mallSuspendedUntil = new Date(Date.now() + roundedHours * 3600 * 1000).toISOString();
+        newStatus = "suspended";
+        newReason = trimmedReason;
+        mallSuspensionReason = trimmedReason;
+        mallSuspensionHours = roundedHours;
+        message = `Toko '${current.name}' berhasil di-suspend sementara selama ${roundedHours} jam. Fungsi Mall dinonaktifkan sementara. Alasan: "${trimmedReason}".`;
+      } else if (decision === "reactivate") {
+        newStatus = "verified";
+        newReason = null;
+        message = `Status Mall dan verifikasi resmi toko '${current.name}' berhasil diaktifkan kembali.`;
       }
 
       const updateStmt = db.prepare(`
         UPDATE users
         SET verification_status = ?,
             verification_rejection_reason = ?,
+            mall_suspended_until = ?,
+            mall_suspension_reason = ?,
+            mall_suspension_hours = ?,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ? AND role = 'penjual'
       `);
 
-      updateStmt.run(newStatus, newReason, sellerId);
+      updateStmt.run(
+        newStatus,
+        newReason,
+        mallSuspendedUntil,
+        mallSuspensionReason,
+        mallSuspensionHours,
+        sellerId
+      );
 
       // Ambil data penjual yang telah diperbarui
       const selectStmt = db.prepare(`
@@ -1032,7 +1117,10 @@ export class AdminController {
           id, name, username, email, role, status, suspension_reason,
           is_store_open, store_balance, verification_status,
           verification_submitted_at, verification_data,
-          verification_rejection_reason, created_at, updated_at
+          verification_rejection_reason, mall_suspended_until,
+          mall_suspension_reason, mall_suspension_hours,
+          is_balance_frozen, balance_freeze_reason, balance_frozen_at,
+          created_at, updated_at
         FROM users
         WHERE id = ?
       `);
@@ -1061,6 +1149,12 @@ export class AdminController {
         verificationSubmittedAt: row.verification_submitted_at,
         verificationData: parsedData,
         verificationRejectionReason: row.verification_rejection_reason,
+        mallSuspendedUntil: row.mall_suspended_until,
+        mallSuspensionReason: row.mall_suspension_reason,
+        mallSuspensionHours: row.mall_suspension_hours,
+        isBalanceFrozen: row.is_balance_frozen === 1,
+        balanceFreezeReason: row.balance_freeze_reason,
+        balanceFrozenAt: row.balance_frozen_at,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
       };
@@ -1072,6 +1166,7 @@ export class AdminController {
           SUM(CASE WHEN verification_status = 'pending' THEN 1 ELSE 0 END) as pendingCount,
           SUM(CASE WHEN verification_status = 'verified' THEN 1 ELSE 0 END) as verifiedCount,
           SUM(CASE WHEN verification_status = 'rejected' THEN 1 ELSE 0 END) as rejectedCount,
+          SUM(CASE WHEN verification_status = 'suspended' THEN 1 ELSE 0 END) as suspendedCount,
           SUM(CASE WHEN verification_status = 'unverified' OR verification_status IS NULL THEN 1 ELSE 0 END) as unverifiedCount
         FROM users
         WHERE role = 'penjual'
@@ -1087,6 +1182,7 @@ export class AdminController {
           pendingCount: latestStats.pendingCount || 0,
           verifiedCount: latestStats.verifiedCount || 0,
           rejectedCount: latestStats.rejectedCount || 0,
+          suspendedCount: latestStats.suspendedCount || 0,
           unverifiedCount: latestStats.unverifiedCount || 0,
         },
       });
@@ -1119,7 +1215,9 @@ export class AdminController {
           COALESCE(SUM(store_balance), 0) as totalStoreBalance,
           COALESCE(AVG(store_balance), 0) as averageStoreBalance,
           SUM(CASE WHEN store_balance > 0 THEN 1 ELSE 0 END) as sellersWithBalanceCount,
-          SUM(CASE WHEN store_balance <= 0 OR store_balance IS NULL THEN 1 ELSE 0 END) as sellersWithZeroBalanceCount
+          SUM(CASE WHEN store_balance <= 0 OR store_balance IS NULL THEN 1 ELSE 0 END) as sellersWithZeroBalanceCount,
+          SUM(CASE WHEN is_balance_frozen = 1 THEN 1 ELSE 0 END) as frozenSellersCount,
+          COALESCE(SUM(CASE WHEN is_balance_frozen = 1 THEN store_balance ELSE 0 END), 0) as totalFrozenBalance
         FROM users
         WHERE role = 'penjual'
       `);
@@ -1130,6 +1228,8 @@ export class AdminController {
         averageStoreBalance: number;
         sellersWithBalanceCount: number;
         sellersWithZeroBalanceCount: number;
+        frozenSellersCount: number;
+        totalFrozenBalance: number;
       };
 
       // 2. Susun kueri pemfilteran
@@ -1146,6 +1246,10 @@ export class AdminController {
         conditions.push("store_balance > 0");
       } else if (balanceStatus === "zero_balance") {
         conditions.push("(store_balance <= 0 OR store_balance IS NULL)");
+      } else if (balanceStatus === "frozen") {
+        conditions.push("is_balance_frozen = 1");
+      } else if (balanceStatus === "active" || balanceStatus === "unfrozen") {
+        conditions.push("is_balance_frozen = 0");
       }
 
       if (storeStatus === "open") {
@@ -1168,7 +1272,9 @@ export class AdminController {
       const query = `
         SELECT 
           id, name, username, email, role, status, is_store_open, store_balance,
-          verification_status, created_at, updated_at
+          verification_status, mall_suspended_until, mall_suspension_reason,
+          mall_suspension_hours, is_balance_frozen, balance_freeze_reason,
+          balance_frozen_at, created_at, updated_at
         FROM users
         ${whereClause}
         ${orderBy}
@@ -1185,6 +1291,12 @@ export class AdminController {
         is_store_open: number;
         store_balance: number;
         verification_status: string | null;
+        mall_suspended_until: string | null;
+        mall_suspension_reason: string | null;
+        mall_suspension_hours: number | null;
+        is_balance_frozen: number | null;
+        balance_freeze_reason: string | null;
+        balance_frozen_at: string | null;
         created_at: string;
         updated_at: string;
       }>;
@@ -1199,6 +1311,12 @@ export class AdminController {
         isStoreOpen: r.is_store_open !== 0,
         storeBalance: Number(r.store_balance || 0),
         verificationStatus: r.verification_status || "unverified",
+        mallSuspendedUntil: r.mall_suspended_until,
+        mallSuspensionReason: r.mall_suspension_reason,
+        mallSuspensionHours: r.mall_suspension_hours,
+        isBalanceFrozen: r.is_balance_frozen === 1,
+        balanceFreezeReason: r.balance_freeze_reason,
+        balanceFrozenAt: r.balance_frozen_at,
         createdAt: r.created_at,
         updatedAt: r.updated_at,
       }));
@@ -1216,6 +1334,8 @@ export class AdminController {
           sellersWithBalanceCount: statsResult.sellersWithBalanceCount || 0,
           zeroBalanceCount: statsResult.sellersWithZeroBalanceCount || 0,
           sellersWithZeroBalanceCount: statsResult.sellersWithZeroBalanceCount || 0,
+          frozenSellersCount: statsResult.frozenSellersCount || 0,
+          totalFrozenBalance: Number(statsResult.totalFrozenBalance || 0),
         },
       });
     } catch (error) {
@@ -1419,6 +1539,152 @@ export class AdminController {
       res.status(500).json({
         success: false,
         message: "Gagal mengambil riwayat mutasi saldo penjual.",
+      });
+    }
+  }
+
+  /**
+   * Membekukan atau membuka pembekuan saldo toko penjual oleh Administrator
+   * PATCH /api/admin/sellers/:id/balance/freeze
+   */
+  async toggleSellerBalanceFreeze(req: Request, res: Response): Promise<void> {
+    try {
+      const sellerId = Number(req.params.id);
+      if (!sellerId || isNaN(sellerId)) {
+        res.status(400).json({
+          success: false,
+          message: "ID penjual tidak valid.",
+        });
+        return;
+      }
+
+      const { action, reason } = req.body;
+      if (!action || !["freeze", "unfreeze"].includes(action)) {
+        res.status(400).json({
+          success: false,
+          message: "Aksi tidak valid. Pilihan yang diperbolehkan: 'freeze' atau 'unfreeze'.",
+        });
+        return;
+      }
+
+      const checkStmt = db.prepare(`
+        SELECT id, name, username, email, store_balance, is_balance_frozen, balance_freeze_reason
+        FROM users
+        WHERE id = ? AND role = 'penjual'
+      `);
+      const seller = checkStmt.get(sellerId) as unknown as {
+        id: number;
+        name: string;
+        username: string;
+        email: string;
+        store_balance: number | null;
+        is_balance_frozen: number | null;
+        balance_freeze_reason: string | null;
+      } | undefined;
+
+      if (!seller) {
+        res.status(404).json({
+          success: false,
+          message: "Akun penjual tidak ditemukan.",
+        });
+        return;
+      }
+
+      const currentBalance = Number(seller.store_balance || 0);
+      const adminId = req.user?.id || null;
+      const trimmedReason = typeof reason === "string" ? reason.trim() : "";
+
+      if (action === "freeze") {
+        if (!trimmedReason) {
+          res.status(400).json({
+            success: false,
+            message:
+              "Alasan pembekuan saldo wajib diisi (misal: terjadi kecurangan transaksi, tindakan ilegal, audit keamanan, dll).",
+          });
+          return;
+        }
+
+        const freezeStmt = db.prepare(`
+          UPDATE users
+          SET is_balance_frozen = 1,
+              balance_freeze_reason = ?,
+              balance_frozen_at = CURRENT_TIMESTAMP,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ? AND role = 'penjual'
+        `);
+        freezeStmt.run(trimmedReason, sellerId);
+
+        // Catat riwayat audit mutasi pembekuan saldo
+        const mutationStmt = db.prepare(`
+          INSERT INTO balance_mutations (
+            user_id, role, type, amount, balance_before, balance_after, description, admin_id
+          ) VALUES (?, 'penjual', 'freeze', 0, ?, ?, ?, ?)
+        `);
+        mutationStmt.run(
+          sellerId,
+          currentBalance,
+          currentBalance,
+          `[PEMBEKUAN SALDO] Saldo dibekukan oleh Admin: ${trimmedReason}`,
+          adminId
+        );
+
+        res.json({
+          success: true,
+          message: `Saldo toko '${seller.name}' berhasil dibekukan. Penarikan dana dinonaktifkan sementara. Alasan: "${trimmedReason}".`,
+          seller: {
+            id: seller.id,
+            name: seller.name,
+            storeBalance: currentBalance,
+            isBalanceFrozen: true,
+            balanceFreezeReason: trimmedReason,
+            balanceFrozenAt: new Date().toISOString(),
+          },
+        });
+      } else {
+        // Unfreeze
+        const unfreezeStmt = db.prepare(`
+          UPDATE users
+          SET is_balance_frozen = 0,
+              balance_freeze_reason = NULL,
+              balance_frozen_at = NULL,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ? AND role = 'penjual'
+        `);
+        unfreezeStmt.run(sellerId);
+
+        // Catat riwayat audit mutasi pembukaan saldo
+        const mutationStmt = db.prepare(`
+          INSERT INTO balance_mutations (
+            user_id, role, type, amount, balance_before, balance_after, description, admin_id
+          ) VALUES (?, 'penjual', 'unfreeze', 0, ?, ?, ?, ?)
+        `);
+        const note = trimmedReason ? `Catatan: ${trimmedReason}` : "Pembekuan saldo dicabut oleh Admin";
+        mutationStmt.run(
+          sellerId,
+          currentBalance,
+          currentBalance,
+          `[PEMBUKAAN PEMBEKUAN SALDO] ${note}`,
+          adminId
+        );
+
+        res.json({
+          success: true,
+          message: `Pembekuan saldo toko '${seller.name}' berhasil dicabut. Penjual dapat kembali menarik dana secara normal.`,
+          seller: {
+            id: seller.id,
+            name: seller.name,
+            storeBalance: currentBalance,
+            isBalanceFrozen: false,
+            balanceFreezeReason: null,
+            balanceFrozenAt: null,
+          },
+        });
+      }
+    } catch (error) {
+      console.error("[AdminController.toggleSellerBalanceFreeze] Error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Gagal memperbarui status pembekuan saldo akun penjual.",
       });
     }
   }

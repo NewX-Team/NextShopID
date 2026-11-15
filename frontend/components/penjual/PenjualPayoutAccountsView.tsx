@@ -17,6 +17,7 @@ import {
   TrendingUpIcon,
   ShieldIcon,
   DollarSignIcon,
+  LockIcon,
 } from "@/components/ui/icons";
 import {
   sellerService,
@@ -481,6 +482,16 @@ export const PenjualPayoutAccountsView: React.FC<PenjualPayoutAccountsViewProps>
     e.preventDefault();
     if (!token) return;
 
+    if (sellerProfile?.isBalanceFrozen) {
+      setFeedback({
+        type: "error",
+        text: `Penarikan saldo tidak dapat diproses: Saldo toko Anda sedang dibekukan oleh admin (${
+          sellerProfile.balanceFreezeReason || "Terjadi kecurangan / investigasi"
+        }).`,
+      });
+      return;
+    }
+
     if (accounts.length === 0) {
       setFeedback({
         type: "error",
@@ -628,6 +639,36 @@ export const PenjualPayoutAccountsView: React.FC<PenjualPayoutAccountsViewProps>
         </div>
       )}
 
+      {/* Banner Peringatan Pembekuan Saldo Penjual */}
+      {sellerProfile?.isBalanceFrozen && (
+        <div className="p-5 sm:p-6 rounded-3xl bg-rose-500/10 border border-rose-500/25 text-rose-900 dark:text-rose-200 shadow-md">
+          <div className="flex items-start gap-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-rose-500/20 text-rose-600 dark:text-rose-400">
+              <LockIcon size={22} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-sm sm:text-base font-bold text-rose-900 dark:text-rose-200">
+                  Saldo Akun Toko Sedang Dibekukan oleh Administrator
+                </h3>
+                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-800 dark:text-rose-300">
+                  Status: Terkunci
+                </span>
+              </div>
+              <p className="text-xs text-rose-800/90 dark:text-rose-300/90 mt-1 leading-relaxed">
+                Alasan Pembekuan:{" "}
+                <span className="font-semibold underline">
+                  {sellerProfile.balanceFreezeReason || "Terjadi kecurangan transaksi / investigasi kepatuhan platform."}
+                </span>
+              </p>
+              <p className="text-[11px] text-rose-700/80 dark:text-rose-400/80 mt-2">
+                Seluruh fungsi penarikan dana (WD) dinonaktifkan sementara demi keamanan akun. Silakan hubungi admin NextShopID jika membutuhkan klarifikasi lebih lanjut.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 1. HERO SHOWCASE: KARTU DOMPET SALDO EKSEKUTIF (FINTECH WALLET CARD) */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#09101d] via-[#0f172a] to-[#062c26] border border-emerald-500/25 p-6 sm:p-8 text-white shadow-xl">
         {/* Dekorasi Ambient Glow di Latar Belakang */}
@@ -639,10 +680,17 @@ export const PenjualPayoutAccountsView: React.FC<PenjualPayoutAccountsViewProps>
           {/* Sisi Kiri: Saldo Utama Toko */}
           <div className="space-y-3">
             <div className="flex items-center gap-2.5">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 backdrop-blur-md">
-                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                Saldo Siap Ditarik
-              </span>
+              {sellerProfile?.isBalanceFrozen ? (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30 backdrop-blur-md">
+                  <LockIcon size={12} className="text-rose-400" />
+                  Saldo Dibekukan
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 backdrop-blur-md">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                  Saldo Siap Ditarik
+                </span>
+              )}
               <span className="text-xs text-slate-400 font-medium hidden sm:inline">
                 Toko {sellerProfile?.name || "Mitra"} • Realtime
               </span>
@@ -1142,14 +1190,24 @@ export const PenjualPayoutAccountsView: React.FC<PenjualPayoutAccountsViewProps>
                     type="submit"
                     disabled={
                       isSubmittingWithdrawal ||
+                      Boolean(sellerProfile?.isBalanceFrozen) ||
                       parsedWithdraw <= 0 ||
                       parsedWithdraw < 10000 ||
                       parsedWithdraw > currentBalance ||
                       !selectedAccountId
                     }
-                    className="w-full flex items-center justify-center gap-2.5 py-3.5 px-4 rounded-2xl bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-black text-xs sm:text-sm shadow-lg shadow-emerald-500/20 transition-all cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
+                    className={`w-full flex items-center justify-center gap-2.5 py-3.5 px-4 rounded-2xl font-black text-xs sm:text-sm shadow-lg transition-all cursor-pointer disabled:opacity-40 disabled:pointer-events-none ${
+                      sellerProfile?.isBalanceFrozen
+                        ? "bg-rose-600 text-white shadow-rose-950/20"
+                        : "bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 shadow-emerald-500/20"
+                    }`}
                   >
-                    {isSubmittingWithdrawal ? (
+                    {sellerProfile?.isBalanceFrozen ? (
+                      <>
+                        <LockIcon size={16} />
+                        <span>Saldo Toko Sedang Dibekukan Admin</span>
+                      </>
+                    ) : isSubmittingWithdrawal ? (
                       <>
                         <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
                         <span>Memproses Pencairan Dana...</span>

@@ -111,6 +111,30 @@ export function initDatabase(): void {
     db.exec("ALTER TABLE users ADD COLUMN verification_rejection_reason TEXT DEFAULT NULL;");
     console.log("[Database] Kolom 'verification_rejection_reason' berhasil ditambahkan ke tabel users.");
   }
+  if (!userColumns.some((c) => c.name === "mall_suspended_until")) {
+    db.exec("ALTER TABLE users ADD COLUMN mall_suspended_until DATETIME DEFAULT NULL;");
+    console.log("[Database] Kolom 'mall_suspended_until' berhasil ditambahkan ke tabel users.");
+  }
+  if (!userColumns.some((c) => c.name === "mall_suspension_reason")) {
+    db.exec("ALTER TABLE users ADD COLUMN mall_suspension_reason TEXT DEFAULT NULL;");
+    console.log("[Database] Kolom 'mall_suspension_reason' berhasil ditambahkan ke tabel users.");
+  }
+  if (!userColumns.some((c) => c.name === "mall_suspension_hours")) {
+    db.exec("ALTER TABLE users ADD COLUMN mall_suspension_hours INTEGER DEFAULT NULL;");
+    console.log("[Database] Kolom 'mall_suspension_hours' berhasil ditambahkan ke tabel users.");
+  }
+  if (!userColumns.some((c) => c.name === "is_balance_frozen")) {
+    db.exec("ALTER TABLE users ADD COLUMN is_balance_frozen INTEGER NOT NULL DEFAULT 0;");
+    console.log("[Database] Kolom 'is_balance_frozen' berhasil ditambahkan ke tabel users.");
+  }
+  if (!userColumns.some((c) => c.name === "balance_freeze_reason")) {
+    db.exec("ALTER TABLE users ADD COLUMN balance_freeze_reason TEXT DEFAULT NULL;");
+    console.log("[Database] Kolom 'balance_freeze_reason' berhasil ditambahkan ke tabel users.");
+  }
+  if (!userColumns.some((c) => c.name === "balance_frozen_at")) {
+    db.exec("ALTER TABLE users ADD COLUMN balance_frozen_at DATETIME DEFAULT NULL;");
+    console.log("[Database] Kolom 'balance_frozen_at' berhasil ditambahkan ke tabel users.");
+  }
 
   // 2. Inisialisasi tabel riwayat mutasi saldo (penjual & pembeli)
   db.exec(`
