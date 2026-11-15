@@ -193,10 +193,18 @@ export const PenjualPayoutAccountsView: React.FC<PenjualPayoutAccountsViewProps>
     };
 
     if (addMode === "preset") {
-      if (!presetNumber.trim()) {
+      const cleanNumber = presetNumber.trim();
+      if (!cleanNumber) {
         setFeedback({
           type: "error",
           text: `Silakan masukkan ${presetType === "bank" ? "nomor rekening" : "nomor e-wallet"} Anda.`,
+        });
+        return;
+      }
+      if (!/^\d+$/.test(cleanNumber)) {
+        setFeedback({
+          type: "error",
+          text: `${presetType === "bank" ? "Nomor rekening" : "Nomor e-wallet"} wajib hanya menggunakan angka (0-9) dan tidak bisa huruf atau karakter lain.`,
         });
         return;
       }
@@ -210,7 +218,7 @@ export const PenjualPayoutAccountsView: React.FC<PenjualPayoutAccountsViewProps>
       payload = {
         accountType: presetType,
         providerName: presetProvider,
-        accountNumber: presetNumber.trim(),
+        accountNumber: cleanNumber,
         accountHolderName: presetHolderName.trim(),
         method: "preset",
         isAgreed: true,
@@ -220,14 +228,22 @@ export const PenjualPayoutAccountsView: React.FC<PenjualPayoutAccountsViewProps>
       if (!manualHolderName.trim()) {
         setFeedback({
           type: "error",
-          text: "Nama lengkap pemilik akun wajib diisi.",
+          text: "Nama lengkap pemilik akun wajib diisi (bebas huruf dan angka).",
         });
         return;
       }
-      if (!manualNumber.trim()) {
+      const cleanManualNumber = manualNumber.trim();
+      if (!cleanManualNumber) {
         setFeedback({
           type: "error",
           text: `Silakan masukkan ${manualType === "bank" ? "nomor rekening bank" : "nomor e-wallet"} Anda.`,
+        });
+        return;
+      }
+      if (!/^\d+$/.test(cleanManualNumber)) {
+        setFeedback({
+          type: "error",
+          text: `${manualType === "bank" ? "Nomor rekening bank" : "Nomor akun e-wallet"} wajib hanya menggunakan angka (0-9) dan tidak bisa huruf atau karakter lain.`,
         });
         return;
       }
@@ -248,7 +264,7 @@ export const PenjualPayoutAccountsView: React.FC<PenjualPayoutAccountsViewProps>
       payload = {
         accountType: manualType,
         providerName: manualProviderName.trim(),
-        accountNumber: manualNumber.trim(),
+        accountNumber: cleanManualNumber,
         accountHolderName: manualHolderName.trim(),
         method: "manual",
         isAgreed: true,
@@ -824,30 +840,45 @@ export const PenjualPayoutAccountsView: React.FC<PenjualPayoutAccountsViewProps>
 
                   {/* Input Nomor Rekening atau Nomor E-Wallet */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                      {presetType === "bank" ? "Nomor Rekening Bank" : "Nomor E-Wallet (No. Handphone)"}
-                    </label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        {presetType === "bank" ? "Nomor Rekening Bank" : "Nomor E-Wallet (No. Handphone)"}
+                      </label>
+                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                        Wajib Angka (0-9)
+                      </span>
+                    </div>
                     <input
                       type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       required
                       value={presetNumber}
-                      onChange={(e) => setPresetNumber(e.target.value)}
+                      onChange={(e) => setPresetNumber(e.target.value.replace(/\D/g, ""))}
                       placeholder={
                         presetType === "bank"
-                          ? "Contoh: 1234567890"
-                          : "Contoh: 081234567890"
+                          ? "Contoh: 1234567890 (Hanya angka)"
+                          : "Contoh: 081234567890 (Hanya angka)"
                       }
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 text-slate-900 dark:text-white text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     />
+                    <p className="text-[10.5px] text-slate-400 mt-1">
+                      Ketikkan hanya digit angka. Huruf dan simbol otomatis tidak dapat dimasukkan.
+                    </p>
                   </div>
 
                   {/* Input Nama Lengkap Rekening / Wallet */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                      {presetType === "bank"
-                        ? "Nama Lengkap Pemilik Rekening"
-                        : "Nama Lengkap Akun Dompet Digital"}
-                    </label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        {presetType === "bank"
+                          ? "Nama Lengkap Pemilik Rekening"
+                          : "Nama Lengkap Akun Dompet Digital"}
+                      </label>
+                      <span className="text-[10px] text-slate-400">
+                        Bebas Huruf & Angka
+                      </span>
+                    </div>
                     <input
                       type="text"
                       required
@@ -907,9 +938,14 @@ export const PenjualPayoutAccountsView: React.FC<PenjualPayoutAccountsViewProps>
 
                   {/* 2. Terus ditanya nama lengkapnya */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                      2. Nama Lengkap Pemilik
-                    </label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        2. Nama Lengkap Pemilik
+                      </label>
+                      <span className="text-[10px] text-slate-400">
+                        Bebas Huruf & Angka
+                      </span>
+                    </div>
                     <input
                       type="text"
                       required
@@ -920,34 +956,49 @@ export const PenjualPayoutAccountsView: React.FC<PenjualPayoutAccountsViewProps>
                     />
                   </div>
 
-                  {/* 3. Kalau bank ditanya no rek, kalau wallet ditanya no wallet */}
+                  {/* 3. Kalau bank ditanya no rek, kalau wallet ditanya no wallet (Wajib Angka) */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                      {manualType === "bank"
-                        ? "3. Nomor Rekening Bank"
-                        : "3. Nomor Akun E-Wallet / Handphone"}
-                    </label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        {manualType === "bank"
+                          ? "3. Nomor Rekening Bank"
+                          : "3. Nomor Akun E-Wallet / Handphone"}
+                      </label>
+                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                        Wajib Angka (0-9)
+                      </span>
+                    </div>
                     <input
                       type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       required
                       value={manualNumber}
-                      onChange={(e) => setManualNumber(e.target.value)}
+                      onChange={(e) => setManualNumber(e.target.value.replace(/\D/g, ""))}
                       placeholder={
                         manualType === "bank"
-                          ? "Masukkan nomor rekening bank..."
-                          : "Masukkan nomor akun / HP e-wallet..."
+                          ? "Masukkan nomor rekening bank (hanya angka)..."
+                          : "Masukkan nomor akun / HP e-wallet (hanya angka)..."
                       }
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 text-slate-900 dark:text-white text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     />
+                    <p className="text-[10.5px] text-slate-400 mt-1">
+                      Wajib menggunakan angka (0-9). Huruf dan simbol otomatis tidak dapat diketik.
+                    </p>
                   </div>
 
                   {/* 4. Di akhir nama bank atau wallet diketik manual */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                      {manualType === "bank"
-                        ? "4. Nama Bank (Ketik Manual)"
-                        : "4. Nama E-Wallet (Ketik Manual)"}
-                    </label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        {manualType === "bank"
+                          ? "4. Nama Bank (Ketik Manual)"
+                          : "4. Nama E-Wallet (Ketik Manual)"}
+                      </label>
+                      <span className="text-[10px] text-slate-400">
+                        Bebas Huruf & Angka
+                      </span>
+                    </div>
                     <input
                       type="text"
                       required

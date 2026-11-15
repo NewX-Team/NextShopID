@@ -507,25 +507,26 @@ export class SellerController {
         return;
       }
 
-      // 4. Validasi Nomor Rekening / Wallet
-      const rawNumber = String(accountNumber || "").replace(/[\s-]/g, "").trim();
-      if (!rawNumber || rawNumber.length < 5 || rawNumber.length > 35) {
+      // 4. Validasi Nomor Rekening / Wallet: Wajib HANYA ANGKA (0-9)
+      const rawNumber = String(accountNumber || "").trim();
+      const isDigitsOnly = /^[0-9]+$/.test(rawNumber);
+      if (!rawNumber || !isDigitsOnly || rawNumber.length < 5 || rawNumber.length > 35) {
         res.status(400).json({
           success: false,
           message:
             accountType === "bank"
-              ? "Nomor rekening harus terdiri dari 5-35 karakter numerik."
-              : "Nomor e-wallet / HP harus terdiri dari 5-35 digit nomor yang valid.",
+              ? "Nomor rekening bank wajib hanya menggunakan angka (0-9) dan tidak boleh mengandung huruf atau simbol (5-35 digit)."
+              : "Nomor e-wallet / handphone wajib hanya menggunakan angka (0-9) dan tidak boleh mengandung huruf atau simbol (5-35 digit).",
         });
         return;
       }
 
-      // 5. Validasi Nama Pemilik Akun
+      // 5. Validasi Nama Pemilik Akun (Bebas huruf dan angka)
       const cleanHolderName = String(accountHolderName || "").trim();
       if (!cleanHolderName || cleanHolderName.length < 2) {
         res.status(400).json({
           success: false,
-          message: "Nama lengkap pemilik akun rekening/wallet minimal 2 karakter.",
+          message: "Nama lengkap pemilik akun rekening/wallet minimal 2 karakter (bebas kombinasi huruf dan angka).",
         });
         return;
       }

@@ -88,6 +88,54 @@ describe("Seller Payout Accounts API - GET, POST & DELETE /api/seller/payout-acc
       expect(shortNumRes.status).toBe(400);
     });
 
+    it("harus menolak (400) jika nomor rekening atau nomor wallet mengandung huruf atau simbol", async () => {
+      const letterInBankRes = await request(app)
+        .post("/api/seller/payout-accounts")
+        .set("Authorization", `Bearer ${sellerToken}`)
+        .send({
+          accountType: "bank",
+          providerName: "Bank Central Asia (BCA)",
+          accountNumber: "12345ABCDE",
+          accountHolderName: "Penjual Official",
+          method: "preset",
+        });
+      expect(letterInBankRes.status).toBe(400);
+      expect(letterInBankRes.body.message).toContain("hanya menggunakan angka (0-9)");
+
+      const letterInWalletRes = await request(app)
+        .post("/api/seller/payout-accounts")
+        .set("Authorization", `Bearer ${sellerToken}`)
+        .send({
+          accountType: "wallet",
+          providerName: "GoPay",
+          accountNumber: "0812-3456-WALLET",
+          accountHolderName: "Penjual Official",
+          method: "preset",
+        });
+      expect(letterInWalletRes.status).toBe(400);
+      expect(letterInWalletRes.body.message).toContain("hanya menggunakan angka (0-9)");
+    });
+
+    it("berhasil menerima nama pemilik dan nama bank/wallet dengan kombinasi huruf dan angka", async () => {
+      const res = await request(app)
+        .post("/api/seller/payout-accounts")
+        .set("Authorization", `Bearer ${sellerToken}`)
+        .send({
+          accountType: "bank",
+          providerName: "Bank Digital 88",
+          accountNumber: "9988776655",
+          accountHolderName: "Toko Mitra 99 Official",
+          method: "manual",
+          isAgreed: true,
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.accountHolderName).toBe("Toko Mitra 99 Official");
+      expect(res.body.data.providerName).toBe("Bank Digital 88");
+      expect(res.body.data.accountNumber).toBe("9988776655");
+    });
+
     it("harus menolak (400) metode manual jika tanda persetujuan keabsahan (isAgreed) tidak dicentang", async () => {
       const res = await request(app)
         .post("/api/seller/payout-accounts")
