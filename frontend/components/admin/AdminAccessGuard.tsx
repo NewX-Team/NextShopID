@@ -7,7 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 /**
  * Global Guard untuk membatasi akses Administrator:
  * Admin didedikasikan penuh untuk administrasi sistem dan TIDAK dapat mengakses
- * halaman toko publik (seperti '/', '/katalog', '/terbaru', '/promo', '/favorite', dll).
+ * halaman toko publik (seperti '/', '/katalog', '/terbaru', '/promo', dll).
  * Jika admin berusaha mengakses halaman toko, akan langsung dialihkan ke '/admin'.
  */
 export const AdminAccessGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {

@@ -4,7 +4,6 @@ import React from "react";
 import Link from "next/link";
 import {
   PackageIcon,
-  HeartIcon,
   CreditCardIcon,
   ShoppingBagIcon,
   ArrowRightIcon,
@@ -14,7 +13,7 @@ import {
 import { useAuth } from "@/context/AuthContext";
 
 interface PembeliDashboardViewProps {
-  onNavigateTab?: (tab: "orders" | "favorites" | "profile" | "settings") => void;
+  onNavigateTab?: (tab: "orders" | "profile" | "settings") => void;
   buyerBalance?: number;
 }
 
@@ -44,7 +43,7 @@ export const PembeliDashboardView: React.FC<PembeliDashboardViewProps> = ({
             Halo, {user?.name || "Pelanggan Setia"}!
           </h1>
           <p className="text-xs sm:text-sm text-blue-100 max-w-xl leading-relaxed">
-            Pantau status pengiriman pesanan Anda, jelajahi produk wishlist favorit, dan kelola informasi akun dengan mudah di dashboard pembeli.
+            Pantau status pengiriman pesanan Anda dan kelola informasi akun dengan mudah di dashboard pembeli.
           </p>
         </div>
 
@@ -59,8 +58,8 @@ export const PembeliDashboardView: React.FC<PembeliDashboardViewProps> = ({
         </div>
       </div>
 
-      {/* 4 Kartu Metrik Pembeli */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* 3 Kartu Metrik Pembeli */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {/* Metrik 1: Saldo Belanja */}
         <div className="p-5 rounded-3xl bg-white dark:bg-[#111827] border border-slate-200/90 dark:border-white/10 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between mb-3">
@@ -97,25 +96,7 @@ export const PembeliDashboardView: React.FC<PembeliDashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Metrik 3: Produk Favorit */}
-        <div className="p-5 rounded-3xl bg-white dark:bg-[#111827] border border-slate-200/90 dark:border-white/10 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-              Wishlist / Favorit
-            </span>
-            <div className="p-2 rounded-xl bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border border-rose-200/60 dark:border-rose-800/60">
-              <HeartIcon size={18} />
-            </div>
-          </div>
-          <div>
-            <div className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-              0 <span className="text-sm font-normal text-slate-400">Produk</span>
-            </div>
-            <p className="text-[11px] text-slate-400 mt-1">Disimpan untuk nanti</p>
-          </div>
-        </div>
-
-        {/* Metrik 4: Status Akun */}
+        {/* Metrik 3: Status Akun */}
         <div className="p-5 rounded-3xl bg-white dark:bg-[#111827] border border-slate-200/90 dark:border-white/10 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
@@ -169,34 +150,34 @@ export const PembeliDashboardView: React.FC<PembeliDashboardViewProps> = ({
           )}
         </div>
 
-        {/* Card Favorit */}
+        {/* Card Profil & Pengaturan */}
         <div className="p-6 rounded-3xl bg-white dark:bg-[#111827] border border-slate-200/90 dark:border-white/10 shadow-xs flex flex-col justify-between space-y-4">
           <div className="space-y-2">
-            <div className="inline-flex p-3 rounded-2xl bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border border-rose-200/60 dark:border-rose-800/60">
-              <HeartIcon size={24} />
+            <div className="inline-flex p-3 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-800/60">
+              <UserIcon size={24} />
             </div>
             <h3 className="text-base font-bold text-slate-900 dark:text-white">
-              Wishlist & Produk Favorit
+              Profil & Pengaturan Akun
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-              Koleksi barang-barang yang Anda simpan untuk dibeli saat promo diskon atau flash sale.
+              Kelola informasi profil pribadi, alamat penerima barang, dan preferensi akun belanja Anda.
             </p>
           </div>
           {onNavigateTab ? (
             <button
               type="button"
-              onClick={() => onNavigateTab("favorites")}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-600 hover:text-rose-700 cursor-pointer"
+              onClick={() => onNavigateTab("profile")}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-700 cursor-pointer"
             >
-              <span>Lihat Produk Favorit</span>
+              <span>Buka Profil Saya</span>
               <ArrowRightIcon size={14} />
             </button>
           ) : (
             <Link
-              href="/pembeli/favorites"
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-600 hover:text-rose-700"
+              href="/pembeli/profile"
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-700"
             >
-              <span>Lihat Produk Favorit</span>
+              <span>Buka Profil Saya</span>
               <ArrowRightIcon size={14} />
             </Link>
           )}

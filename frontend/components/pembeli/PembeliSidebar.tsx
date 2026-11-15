@@ -5,7 +5,6 @@ import Link from "next/link";
 import {
   DashboardIcon,
   PackageIcon,
-  HeartIcon,
   UserIcon,
   SettingsIcon,
   LogoutIcon,
@@ -22,7 +21,6 @@ import { useTheme } from "@/context/ThemeContext";
 export type PembeliMenuKey =
   | "dashboard"
   | "orders"
-  | "favorites"
   | "profile"
   | "settings";
 
@@ -61,12 +59,6 @@ export const PembeliSidebar: React.FC<PembeliSidebarProps> = ({
       label: "Pesanan Saya",
       href: "/pembeli/orders",
       icon: PackageIcon,
-    },
-    {
-      key: "favorites",
-      label: "Produk Favorit",
-      href: "/pembeli/favorites",
-      icon: HeartIcon,
     },
     {
       key: "profile",

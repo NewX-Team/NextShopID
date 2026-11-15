@@ -7,7 +7,6 @@ import {
 } from "@/components/pembeli/PembeliSidebar";
 import { PembeliDashboardView } from "@/components/pembeli/PembeliDashboardView";
 import { PembeliOrdersView } from "@/components/pembeli/PembeliOrdersView";
-import { PembeliFavoritesView } from "@/components/pembeli/PembeliFavoritesView";
 import { PembeliProfileView } from "@/components/pembeli/PembeliProfileView";
 import { PembeliSettingsView } from "@/components/pembeli/PembeliSettingsView";
 
@@ -32,7 +31,6 @@ export default function PembeliPage() {
               />
             )}
             {activeMenu === "orders" && <PembeliOrdersView />}
-            {activeMenu === "favorites" && <PembeliFavoritesView />}
             {activeMenu === "profile" && <PembeliProfileView />}
             {activeMenu === "settings" && <PembeliSettingsView />}
           </main>

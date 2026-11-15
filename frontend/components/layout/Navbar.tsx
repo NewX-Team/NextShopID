@@ -30,7 +30,6 @@ const NAV_ITEMS = [
   { label: "Katalog", id: "Katalog", href: "/katalog" },
   { label: "Terbaru", id: "Terbaru", href: "/terbaru" },
   { label: "Promo", id: "Promo", href: "/promo" },
-  { label: "Favorite", id: "Favorite", href: "/favorite" },
 ];
 
 export const Navbar: React.FC<NavbarProps> = ({ cartItemCount = 0 }) => {
@@ -55,14 +54,6 @@ export const Navbar: React.FC<NavbarProps> = ({ cartItemCount = 0 }) => {
     if (pathname === "/katalog" || pathname.startsWith("/katalog/")) return "Katalog";
     if (pathname === "/terbaru" || pathname.startsWith("/terbaru/")) return "Terbaru";
     if (pathname === "/promo" || pathname.startsWith("/promo/")) return "Promo";
-    if (
-      pathname === "/favorite" ||
-      pathname.startsWith("/favorite/") ||
-      pathname === "/favorites" ||
-      pathname.startsWith("/favorites/")
-    ) {
-      return "Favorite";
-    }
     // Jika di halaman lain seperti /login, /register, /profile, /settings, sembunyikan glider
     return "";
   }, [pathname]);
