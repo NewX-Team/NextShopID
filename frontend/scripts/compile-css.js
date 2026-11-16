@@ -25,6 +25,7 @@ async function compileCss() {
         { base: path.join(frontendDir, "app"), pattern: "**/*", negated: false },
         { base: path.join(frontendDir, "components"), pattern: "**/*", negated: false },
         { base: path.join(frontendDir, "context"), pattern: "**/*", negated: false },
+        { base: path.join(frontendDir, "data"), pattern: "**/*", negated: false },
       ],
     });
 
@@ -73,6 +74,7 @@ if (process.argv.includes("--watch")) {
     path.join(frontendDir, "app"),
     path.join(frontendDir, "components"),
     path.join(frontendDir, "context"),
+    path.join(frontendDir, "data"),
   ];
 
   console.log("[Tailwind CSS] Menjalankan file watcher untuk auto-recompile...");
