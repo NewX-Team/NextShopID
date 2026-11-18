@@ -17,7 +17,7 @@ import { ExternalLinkIcon, StoreIcon } from "@/components/ui/icons";
 
 export default function PenjualPage() {
   const { user, token, isAuthenticated, isLoading, logout } = useAuth();
-  const router = useRouter();
+  const router = useRouter(); 
 
   // State menu aktif, profil realtime, dan status pembaruan
   const [activeMenu, setActiveMenu] = useState<PenjualMenuKey>("dashboard");
