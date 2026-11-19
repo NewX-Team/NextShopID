@@ -14,6 +14,7 @@ export type MarketplaceProduct = {
     badge?: "Mall" | "Terlaris" | "BPOM" | "SNI" | "Lokal" | "Gratis Ongkir";
     accent: string;
     image: string;
+    images?: string[];
     tags: string[];
     emoji?: string;
 };
@@ -134,7 +135,13 @@ export const FLASH_SALE_PRODUCTS: MarketplaceProduct[] = [
         reviewsCount: 642,
         badge: "Mall",
         accent: "from-blue-600 to-indigo-800",
-        image: "https://images.unsplash.com/photo-1546435770-a3e426bf472b?auto=format&fit=crop&w=600&q=80",
+        image: "https://images.unsplash.com/photo-1546435770-a3e426bf472b?auto=format&fit=crop&w=800&q=80",
+        images: [
+            "https://images.unsplash.com/photo-1546435770-a3e426bf472b?auto=format&fit=crop&w=1000&q=80",
+            "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1000&q=80",
+            "https://images.unsplash.com/photo-1583394838336-acd977736f90?auto=format&fit=crop&w=1000&q=80",
+            "https://images.unsplash.com/photo-1484704849700-f032a568e944?auto=format&fit=crop&w=1000&q=80",
+        ],
         tags: ["Gaming", "7.1 Surround", "Official Store"],
     },
     {
@@ -152,7 +159,13 @@ export const FLASH_SALE_PRODUCTS: MarketplaceProduct[] = [
         reviewsCount: 312,
         badge: "Terlaris",
         accent: "from-slate-800 to-slate-950",
-        image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=600&q=80",
+        image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80",
+        images: [
+            "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1000&q=80",
+            "https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?auto=format&fit=crop&w=1000&q=80",
+            "https://images.unsplash.com/photo-1434494878577-86c23bcb06b9?auto=format&fit=crop&w=1000&q=80",
+            "https://images.unsplash.com/photo-1579586337278-3befd40fd17a?auto=format&fit=crop&w=1000&q=80",
+        ],
         tags: ["AMOLED", "Waterproof", "Garansi 1 Thn"],
     },
     {
@@ -170,7 +183,13 @@ export const FLASH_SALE_PRODUCTS: MarketplaceProduct[] = [
         reviewsCount: 1890,
         badge: "BPOM",
         accent: "from-amber-500 to-orange-700",
-        image: "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?auto=format&fit=crop&w=600&q=80",
+        image: "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?auto=format&fit=crop&w=800&q=80",
+        images: [
+            "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?auto=format&fit=crop&w=1000&q=80",
+            "https://images.unsplash.com/photo-1608248597359-00e1262d49f6?auto=format&fit=crop&w=1000&q=80",
+            "https://images.unsplash.com/photo-1556228720-195a672e8a03?auto=format&fit=crop&w=1000&q=80",
+            "https://images.unsplash.com/photo-1571781926291-c477ebfd024b?auto=format&fit=crop&w=1000&q=80",
+        ],
         tags: ["BPOM", "Brightening", "Halal"],
     },
     {
@@ -188,7 +207,12 @@ export const FLASH_SALE_PRODUCTS: MarketplaceProduct[] = [
         reviewsCount: 280,
         badge: "SNI",
         accent: "from-emerald-600 to-teal-800",
-        image: "https://images.unsplash.com/photo-1584269600464-37b1b58a9fe7?auto=format&fit=crop&w=600&q=80",
+        image: "https://images.unsplash.com/photo-1584269600464-37b1b58a9fe7?auto=format&fit=crop&w=800&q=80",
+        images: [
+            "https://images.unsplash.com/photo-1584269600464-37b1b58a9fe7?auto=format&fit=crop&w=1000&q=80",
+            "https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=1000&q=80",
+            "https://images.unsplash.com/photo-1584990347449-389f4124316d?auto=format&fit=crop&w=1000&q=80",
+        ],
         tags: ["Low Sugar", "Keramik", "Hemat Daya"],
     },
     {
@@ -206,7 +230,12 @@ export const FLASH_SALE_PRODUCTS: MarketplaceProduct[] = [
         reviewsCount: 520,
         badge: "Mall",
         accent: "from-violet-600 to-indigo-900",
-        image: "https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=600&q=80",
+        image: "https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=800&q=80",
+        images: [
+            "https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=1000&q=80",
+            "https://images.unsplash.com/photo-1595225476474-87563907a212?auto=format&fit=crop&w=1000&q=80",
+            "https://images.unsplash.com/photo-1618384887929-16ec33fab9ef?auto=format&fit=crop&w=1000&q=80",
+        ],
         tags: ["Hot Swap", "RGB", "Clicky"],
     },
     {
@@ -224,7 +253,12 @@ export const FLASH_SALE_PRODUCTS: MarketplaceProduct[] = [
         reviewsCount: 840,
         badge: "Gratis Ongkir",
         accent: "from-rose-600 to-red-800",
-        image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=600&q=80",
+        image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+        images: [
+            "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=1000&q=80",
+            "https://images.unsplash.com/photo-1608231387042-66d1773070a5?auto=format&fit=crop&w=1000&q=80",
+            "https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&w=1000&q=80",
+        ],
         tags: ["Ringan", "Anti Slip", "Olahraga"],
     },
 ];
@@ -584,7 +618,72 @@ export const FOR_YOU_PRODUCTS: MarketplaceProduct[] = [
         image: "https://images.unsplash.com/photo-1559056199-641a0ac8b55e?auto=format&fit=crop&w=600&q=80",
         tags: ["Single Origin", "Fresh Roast", "Aroma Mantap"],
     },
+    {
+        id: "fy-17",
+        name: "Kemeja Flanel Katun Pria Lengan Panjang Motif Kotak Klasik",
+        price: 89000,
+        originalPrice: 145000,
+        sold: 28,
+        rating: 0,
+        location: "Surakarta",
+        store: "Flannel House",
+        category: "fashion",
+        description: "Bahan katun flanel lembut hangat, pola regular fit nyaman untuk santai maupun kasual.",
+        stock: 50,
+        reviewsCount: 0,
+        badge: "Lokal",
+        accent: "from-red-800 to-stone-900",
+        image: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&w=800&q=80",
+        images: [
+            "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&w=1000&q=80",
+            "https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?auto=format&fit=crop&w=1000&q=80",
+            "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=1000&q=80",
+        ],
+        tags: ["Katun Flanel", "Casual", "Lokal"],
+    },
+    {
+        id: "fy-18",
+        name: "Speaker Bluetooth Mini Portable Bass Booster Tahan Air IPX5",
+        price: 110000,
+        originalPrice: 199000,
+        sold: 0,
+        rating: 0,
+        location: "Jakarta Utara",
+        store: "SoundWave ID",
+        category: "elektronik",
+        description: "Suara jernih 360 derajat, baterai tahan 10 jam, sertifikasi tahan cipratan air IPX5.",
+        stock: 100,
+        reviewsCount: 0,
+        accent: "from-cyan-700 to-blue-900",
+        image: "https://images.unsplash.com/photo-1545454675-3531b543be5d?auto=format&fit=crop&w=800&q=80",
+        images: [
+            "https://images.unsplash.com/photo-1545454675-3531b543be5d?auto=format&fit=crop&w=1000&q=80",
+            "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?auto=format&fit=crop&w=1000&q=80",
+        ],
+        tags: ["Bluetooth 5.3", "IPX5", "Baru"],
+    },
 ];
+
+export const ALL_PRODUCTS: MarketplaceProduct[] = [
+    ...FLASH_SALE_PRODUCTS,
+    ...FOR_YOU_PRODUCTS,
+];
+
+export function getProductById(id: string): MarketplaceProduct | undefined {
+    return ALL_PRODUCTS.find((p) => p.id === id);
+}
+
+export function getProductImages(product: MarketplaceProduct): string[] {
+    if (product.images && product.images.length > 0) {
+        return product.images;
+    }
+    return [
+        product.image,
+        "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1000&q=80",
+        "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1000&q=80",
+        "https://images.unsplash.com/photo-1546435770-a3e426bf472b?auto=format&fit=crop&w=1000&q=80",
+    ];
+}
 
 export function formatRupiah(value: number): string {
     return `Rp${value.toLocaleString("id-ID")}`;
@@ -596,6 +695,9 @@ export function discountPercent(price: number, originalPrice: number): number {
 }
 
 export function formatSold(sold: number): string {
+    if (sold === 0) {
+        return "Belum ada penjualan";
+    }
     if (sold >= 1000) {
         const ribu = sold / 1000;
         return `${ribu >= 10 ? Math.round(ribu) : ribu.toFixed(1).replace(".0", "")}rb+ terjual`;

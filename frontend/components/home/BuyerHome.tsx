@@ -398,7 +398,10 @@ function ModernProductCard({
     const disc = discountPercent(product.price, product.originalPrice);
 
     return (
-        <div className="group relative flex flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl dark:border-white/10 dark:bg-slate-900">
+        <Link
+            href={`/produk/${product.id}`}
+            className="group relative flex flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl dark:border-white/10 dark:bg-slate-900"
+        >
             {/* Visual with Quick View Overlay Button */}
             <div className="relative">
                 <ProductPhoto product={product} />
@@ -409,6 +412,7 @@ function ModernProductCard({
                         type="button"
                         onClick={(e) => {
                             e.preventDefault();
+                            e.stopPropagation();
                             onQuickView(product);
                         }}
                         className="flex h-9 items-center gap-1.5 rounded-full bg-white px-3.5 text-xs font-bold text-slate-800 shadow-lg transition hover:scale-105 hover:bg-slate-50 dark:bg-slate-900 dark:text-white"
@@ -421,6 +425,7 @@ function ModernProductCard({
                         type="button"
                         onClick={(e) => {
                             e.preventDefault();
+                            e.stopPropagation();
                             onAddToCart(product, 1);
                         }}
                         className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg transition hover:scale-110 hover:bg-blue-700"
@@ -471,7 +476,9 @@ function ModernProductCard({
                     <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
                         <span className="inline-flex items-center gap-1 font-bold text-amber-500">
                             <StarIcon size={13} />
-                            <span className="text-slate-700 dark:text-slate-200">{product.rating}</span>
+                            <span className="text-slate-700 dark:text-slate-200">
+                                {product.rating > 0 ? product.rating : "-"}
+                            </span>
                         </span>
                         <span className="text-slate-400 font-medium">{formatSold(product.sold)}</span>
                     </div>
@@ -481,7 +488,7 @@ function ModernProductCard({
                     </p>
                 </div>
             </div>
-        </div>
+        </Link>
     );
 }
 
@@ -1037,8 +1044,9 @@ export const BuyerHome: React.FC = () => {
                             const progressPercent = Math.min(94, Math.max(45, 100 - stockLeft * 4));
 
                             return (
-                                <div
+                                <Link
                                     key={product.id}
+                                    href={`/produk/${product.id}`}
                                     className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-100 bg-white p-2.5 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg dark:border-white/5 dark:bg-slate-950"
                                 >
                                     <div className="relative overflow-hidden rounded-xl">
@@ -1047,7 +1055,11 @@ export const BuyerHome: React.FC = () => {
                                         {/* Quick button */}
                                         <button
                                             type="button"
-                                            onClick={() => setQuickViewProduct(product)}
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                setQuickViewProduct(product);
+                                            }}
                                             className="absolute bottom-2 right-2 z-20 flex h-7 items-center gap-1 rounded-full bg-white px-2.5 text-[10px] font-bold text-slate-800 shadow opacity-0 group-hover:opacity-100 transition"
                                         >
                                             <EyeIcon size={12} className="text-rose-600" />
@@ -1091,7 +1103,11 @@ export const BuyerHome: React.FC = () => {
                                             {/* Quick Buy Button */}
                                             <button
                                                 type="button"
-                                                onClick={() => handleAddToCart(product, 1)}
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    handleAddToCart(product, 1);
+                                                }}
                                                 className="mt-2 w-full flex items-center justify-center gap-1 rounded-xl bg-rose-600 py-1.5 text-[11px] font-bold text-white transition hover:bg-rose-700 shadow-sm"
                                             >
                                                 <PlusIcon size={13} />
@@ -1099,7 +1115,7 @@ export const BuyerHome: React.FC = () => {
                                             </button>
                                         </div>
                                     </div>
-                                </div>
+                                </Link>
                             );
                         })}
                     </div>

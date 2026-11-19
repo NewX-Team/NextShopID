@@ -119,6 +119,24 @@ export const ChevronLeftIcon: React.FC<IconProps> = ({ size = 16, className = ""
   </svg>
 );
 
+export const ChevronRightIcon: React.FC<IconProps> = ({ size = 16, className = "", ...props }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.75"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    className={className}
+    {...props}
+  >
+    <path d="m9 18 6-6-6-6" />
+  </svg>
+);
+
 export const StarIcon: React.FC<IconProps> = ({ size = 16, className = "", ...props }) => (
   <svg
     width={size}
@@ -1310,5 +1328,27 @@ export const TagIcon: React.FC<IconProps> = ({ size = 18, className = "", ...pro
   >
     <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z" />
     <path d="M7 7h.01" />
+  </svg>
+);
+
+export const ShareIcon: React.FC<IconProps> = ({ size = 18, className = "", ...props }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.75"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    className={className}
+    {...props}
+  >
+    <circle cx="18" cy="5" r="3" />
+    <circle cx="6" cy="12" r="3" />
+    <circle cx="18" cy="19" r="3" />
+    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
   </svg>
 );
