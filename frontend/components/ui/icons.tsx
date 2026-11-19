@@ -364,6 +364,24 @@ export const ChevronDownIcon: React.FC<IconProps> = ({ size = 16, className = ""
   </svg>
 );
 
+export const ChevronUpIcon: React.FC<IconProps> = ({ size = 16, className = "", ...props }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.75"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    className={className}
+    {...props}
+  >
+    <polyline points="18 15 12 9 6 15" />
+  </svg>
+);
+
 export const ShieldIcon: React.FC<IconProps> = ({ size = 18, className = "", ...props }) => (
   <svg
     width={size}

@@ -17,6 +17,11 @@ export type MarketplaceProduct = {
     images?: string[];
     tags: string[];
     emoji?: string;
+    isMall?: boolean;
+    sellerAvatar?: string;
+    sellerRating?: number;
+    sellerProductsCount?: number;
+    sellerResponseTime?: string;
 };
 
 export const HOME_BANNERS = [
@@ -129,8 +134,29 @@ export const FLASH_SALE_PRODUCTS: MarketplaceProduct[] = [
         rating: 4.9,
         location: "Jakarta Barat",
         store: "TechHub Official",
+        isMall: true,
+        sellerAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
+        sellerRating: 4.9,
+        sellerProductsCount: 184,
+        sellerResponseTime: "Hitungan menit",
         category: "elektronik",
-        description: "Driver neodymium 50mm, mikrofon noise-cancelling ultra jernih, bantalan telinga memory foam sejuk dengan isolasi suara maksimal.",
+        description: `Headset Gaming RGB 7.1 Surround Sound Pro dirancang khusus untuk para gamer kompetitif dan penikmat audio berdefinisi tinggi. Menggunakan driver neodymium 50mm yang bertenaga, headset ini mampu menghasilkan detail suara spasial 360 derajat yang sangat presisi, memungkinkan Anda mendengar arah langkah kaki musuh, tembakan jarak jauh, dan efek ledakan secara imersif.
+
+Fitur Unggulan Produk:
+• 7.1 Virtual Surround Sound: Suara posisi 3D presisi tinggi untuk keunggulan strategi saat bermain game battle royale maupun FPS.
+• Mikrofon Noise-Cancelling Ultra Jernih: Komunikasi suara jernih dengan filter peredam bising lingkungan sekitar dan tangkai mikrofon fleksibel 360 derajat.
+• Bantalan Telinga Memory Foam Premium: Dilapisi kulit sintetis protein bernapas yang empuk, tidak membuat daun telinga sakit atau panas saat dipakai maraton berjam-jam.
+• Efek RGB Dynamic Lighting: Pencahayaan estetik dengan 16.8 juta spektrum warna dinamis yang mempercantik setup gaming Anda.
+• Kompatibilitas Luas (Multi-Platform): Mendukung PC Desktop, Laptop, PlayStation 4/5, dan Nintendo Switch melalui konektor USB audio berlapis emas anti-korosi.
+
+Kelengkapan Paket Penjualan:
+1x Headset Gaming RGB 7.1 Surround Pro
+1x Kabel Ekstensi Audio Splitter
+1x Busa Pelindung Mikrofon Cadangan
+1x Buku Petunjuk Penggunaan & Kartu Garansi Resmi
+
+Garansi Resmi & Layanan Purna Jual:
+Produk ini bergaransi resmi distributor selama 12 bulan dengan fasilitas penggantian unit baru apabila terjadi cacat pabrik. Layanan servis terpercaya tersedia di seluruh kota besar di Indonesia.`,
         stock: 18,
         reviewsCount: 642,
         badge: "Mall",
@@ -627,8 +653,22 @@ export const FOR_YOU_PRODUCTS: MarketplaceProduct[] = [
         rating: 0,
         location: "Surakarta",
         store: "Flannel House",
+        isMall: false,
+        sellerAvatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80",
+        sellerRating: 4.8,
+        sellerProductsCount: 38,
+        sellerResponseTime: "1 jam",
         category: "fashion",
-        description: "Bahan katun flanel lembut hangat, pola regular fit nyaman untuk santai maupun kasual.",
+        description: `Kemeja Flanel Katun Pria Lengan Panjang Motif Kotak Klasik dirancang untuk Anda yang mengutamakan kenyamanan dan gaya kasual autentik. Dibuat menggunakan bahan katun flanel 100% pilihan yang telah melalui proses double brushing, menghasilkan tekstur kain yang lembut di kulit dan memberikan kehangatan ideal di cuaca sejuk.
+
+Karakteristik & Detail Bahan:
+• 100% Katun Flanel Pilihan: Lembut, tidak kaku, dan memiliki sirkulasi udara yang baik sehingga tetap nyaman dipakai seharian.
+• Pola Regular-Fit Ergonomis: Potongan proporsional yang pas di tubuh, cocok dipakai berkancing rapi maupun sebagai outer santai.
+• Kancing Jahitan Kuat: Kancing berkualitas dengan jahitan silang dobel yang tidak mudah copot saat dicuci berulang kali.
+• Saku Depan Fungsional: Dilengkapi saku dada kiri dengan potongan motif presisi untuk menyimpan kartu atau kacamata.
+
+Panduan Perawatan:
+Dapat dicuci menggunakan mesin cuci putaran normal dengan air dingin atau suhu ruang. Hindari pemutih klorin agar kepekatan warna motif kotak tetap tahan lama. Setrika dengan temperatur sedang pada bagian dalam kain.`,
         stock: 50,
         reviewsCount: 0,
         badge: "Lokal",
@@ -703,4 +743,17 @@ export function formatSold(sold: number): string {
         return `${ribu >= 10 ? Math.round(ribu) : ribu.toFixed(1).replace(".0", "")}rb+ terjual`;
     }
     return `${sold} terjual`;
+}
+
+export function getSellerInfo(product: MarketplaceProduct) {
+    const isMall = product.isMall !== undefined ? product.isMall : (product.badge === "Mall");
+    return {
+        store: product.store,
+        isMall,
+        location: product.location,
+        avatar: product.sellerAvatar || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80",
+        rating: product.sellerRating || 4.9,
+        productsCount: product.sellerProductsCount || 124,
+        responseTime: product.sellerResponseTime || "Hitungan menit",
+    };
 }
