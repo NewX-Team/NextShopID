@@ -1370,3 +1370,22 @@ export const ShareIcon: React.FC<IconProps> = ({ size = 18, className = "", ...p
     <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
   </svg>
 );
+
+export const MinusIcon: React.FC<IconProps> = ({ size = 18, className = "", ...props }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    className={className}
+    {...props}
+  >
+    <line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+);
+

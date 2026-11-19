@@ -16,6 +16,7 @@ import {
     EyeIcon,
     HeartIcon,
     LocationIcon,
+    MinusIcon,
     PlusIcon,
     ShareIcon,
     ShieldIcon,
@@ -50,6 +51,11 @@ export const ProductDetailTopView: React.FC<ProductDetailTopViewProps> = ({ prod
     const [cartCount, setCartCount] = useState(0);
     const [toastMessage, setToastMessage] = useState<{ title: string; desc: string } | null>(null);
 
+    // Interactive Quantity Drawer & Purchase Mode state
+    const [isQuantityDrawerOpen, setIsQuantityDrawerOpen] = useState(false);
+    const [drawerMode, setDrawerMode] = useState<"buy" | "cart">("buy");
+    const [orderNote, setOrderNote] = useState("");
+
     // Description expand / collapse state
     const [isDescExpanded, setIsDescExpanded] = useState(false);
 
@@ -63,20 +69,24 @@ export const ProductDetailTopView: React.FC<ProductDetailTopViewProps> = ({ prod
         return () => clearTimeout(timer);
     }, [toastMessage]);
 
-    // Keyboard navigation for image slider
+    // Keyboard navigation for image slider & modal dismiss
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "ArrowLeft") {
+            if (e.key === "ArrowLeft" && !isQuantityDrawerOpen) {
                 setActiveImageIndex((prev) => (prev - 1 + images.length) % images.length);
-            } else if (e.key === "ArrowRight") {
+            } else if (e.key === "ArrowRight" && !isQuantityDrawerOpen) {
                 setActiveImageIndex((prev) => (prev + 1) % images.length);
-            } else if (e.key === "Escape" && isLightboxOpen) {
-                setIsLightboxOpen(false);
+            } else if (e.key === "Escape") {
+                if (isQuantityDrawerOpen) {
+                    setIsQuantityDrawerOpen(false);
+                } else if (isLightboxOpen) {
+                    setIsLightboxOpen(false);
+                }
             }
         };
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [images.length, isLightboxOpen]);
+    }, [images.length, isLightboxOpen, isQuantityDrawerOpen]);
 
     const handleShare = () => {
         if (typeof window !== "undefined") {
@@ -94,19 +104,29 @@ export const ProductDetailTopView: React.FC<ProductDetailTopViewProps> = ({ prod
         setActiveImageIndex((prev) => (prev - 1 + images.length) % images.length);
     };
 
-    const handleAddToCart = () => {
-        setCartCount((c) => c + quantity);
-        setToastMessage({
-            title: "Berhasil Masuk Keranjang",
-            desc: `${quantity}x "${product.name.slice(0, 32)}..." telah ditambahkan ke keranjang belanja.`,
-        });
+    const openQuantityDrawer = (mode: "buy" | "cart") => {
+        setDrawerMode(mode);
+        setIsQuantityDrawerOpen(true);
     };
 
-    const handleBuyNow = () => {
-        setToastMessage({
-            title: "Memproses Pembelian",
-            desc: `Melanjutkan pesanan ${quantity}x "${product.name.slice(0, 30)}..." ke pembayaran.`,
-        });
+    const closeQuantityDrawer = () => {
+        setIsQuantityDrawerOpen(false);
+    };
+
+    const handleConfirmAction = () => {
+        if (drawerMode === "cart") {
+            setCartCount((c) => c + quantity);
+            setToastMessage({
+                title: "Berhasil Ditambahkan ke Keranjang",
+                desc: `${quantity}x "${product.name.slice(0, 30)}..." telah ditambahkan ke keranjang belanja. Total: ${formatRupiah(product.price * quantity)}`,
+            });
+        } else {
+            setToastMessage({
+                title: "Melanjutkan Pembelian",
+                desc: `Memproses pembelian ${quantity}x "${product.name.slice(0, 30)}..." (${formatRupiah(product.price * quantity)}) ke checkout pembayaran.`,
+            });
+        }
+        setIsQuantityDrawerOpen(false);
     };
 
     // Rating & Sold evaluation
@@ -384,25 +404,33 @@ export const ProductDetailTopView: React.FC<ProductDetailTopViewProps> = ({ prod
                     {/* Profil Penjual (Kiri) */}
                     <div className="flex items-center gap-4">
                         {/* Profile Avatar:
-                            - Jika status Mall: ada BORDER MALL (border merah tebal + ring glow)
-                            - Jika belum verifikasi: desain umum biasa tanpa border merah
+                            - Jika status Mall: Menggunakan border squircle resmi (modern rounded-2xl dengan subtle dual-ring rose & floating badge MALL di sudut kanan bawah, tanpa menutupi wajah profil)
+                            - Jika belum verifikasi: Tampilan standar natural (rounded-2xl border slate tanpa border merah atau badge)
                         */}
-                        <div
-                            className={`relative h-14 w-14 sm:h-16 sm:w-16 shrink-0 overflow-hidden rounded-full transition-all ${
-                                seller.isMall
-                                    ? "border-2 border-rose-600 ring-4 ring-rose-500/20 shadow-md"
-                                    : "border border-slate-200 dark:border-white/10 shadow-sm"
-                            }`}
-                        >
-                            <img
-                                src={seller.avatar}
-                                alt={seller.store}
-                                className="h-full w-full object-cover object-center"
-                            />
-                            {/* Mini Tag Mall di pojok avatar jika status Mall */}
+                        <div className="relative shrink-0">
+                            <div
+                                className={`relative h-14 w-14 sm:h-16 sm:w-16 rounded-2xl transition-all ${
+                                    seller.isMall
+                                        ? "p-[2.5px] bg-gradient-to-br from-rose-500 via-rose-600 to-red-600 shadow-lg shadow-rose-500/20 ring-2 ring-rose-500/30"
+                                        : "p-[1.5px] bg-slate-200 dark:bg-slate-700 shadow-sm"
+                                }`}
+                            >
+                                <div className="h-full w-full overflow-hidden rounded-[13px] bg-white dark:bg-slate-900">
+                                    <img
+                                        src={seller.avatar}
+                                        alt={seller.store}
+                                        className="h-full w-full object-cover object-center"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Floating Mall Tag Badge di Pojok Kanan Bawah Avatar (Eksklusif Penjual Mall) */}
                             {seller.isMall && (
-                                <span className="absolute bottom-0 inset-x-0 bg-rose-600 text-center text-[8px] font-black uppercase text-white tracking-widest py-0.5">
-                                    MALL
+                                <span
+                                    className="absolute -bottom-1 -right-1 inline-flex items-center gap-0.5 rounded-md bg-rose-600 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-white shadow-md ring-2 ring-white dark:ring-slate-900"
+                                    title="Penjual Terverifikasi Mall"
+                                >
+                                    Mall
                                 </span>
                             )}
                         </div>
@@ -526,56 +554,47 @@ export const ProductDetailTopView: React.FC<ProductDetailTopViewProps> = ({ prod
             {/* 4. TOMBOL BUY & MASUKKAN KERANJANG DI BAGIAN KANAN BAWAH (STICKY / TETAP KELIHATAN SAAT SCROLL) */}
             <aside
                 aria-label="Aksi Pembelian Produk"
-                className="fixed bottom-5 right-5 z-40 hidden sm:flex items-center gap-3 rounded-2xl border border-slate-200/90 bg-white/95 p-3.5 shadow-2xl backdrop-blur-md dark:border-white/15 dark:bg-slate-900/95"
+                className="fixed bottom-5 right-5 z-40 hidden sm:flex items-center gap-3.5 rounded-2xl border border-slate-200/90 bg-white/95 p-3.5 shadow-2xl backdrop-blur-md dark:border-white/15 dark:bg-slate-900/95"
             >
-                {/* Selector Jumlah Pembelian */}
-                <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/5">
-                    <button
-                        type="button"
-                        disabled={quantity <= 1}
-                        onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                        className="px-3 py-1.5 text-slate-600 hover:bg-slate-200/60 disabled:opacity-30 dark:text-slate-300 dark:hover:bg-white/10"
-                        title="Kurangi jumlah"
-                    >
-                        -
-                    </button>
-                    <span className="w-8 text-center text-xs font-bold text-slate-900 dark:text-white">
-                        {quantity}
-                    </span>
-                    <button
-                        type="button"
-                        disabled={quantity >= maxStock}
-                        onClick={() => setQuantity((q) => Math.min(maxStock, q + 1))}
-                        className="px-3 py-1.5 text-slate-600 hover:bg-slate-200/60 disabled:opacity-30 dark:text-slate-300 dark:hover:bg-white/10"
-                        title="Tambah jumlah"
-                    >
-                        +
-                    </button>
-                </div>
-
-                {/* Subtotal Harga */}
-                <div className="flex flex-col text-right pr-1">
-                    <span className="text-[10px] text-slate-400">Total Harga</span>
-                    <span className="text-sm font-black text-slate-900 dark:text-white">
-                        {formatRupiah(product.price * quantity)}
+                {/* Informasi Ringkas Harga Satuan & Stok */}
+                <div className="flex flex-col pr-2 text-left">
+                    <div className="flex items-center gap-2">
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
+                            Harga Satuan
+                        </span>
+                        {product.stock <= 5 && (
+                            <span className="rounded bg-amber-100 px-1.5 py-0.2 text-[9px] font-bold text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
+                                Sisa {product.stock}
+                            </span>
+                        )}
+                    </div>
+                    <span className="text-base font-black tracking-tight text-blue-600 dark:text-blue-400">
+                        {formatRupiah(product.price)}
                     </span>
                 </div>
 
-                {/* Tombol Masukkan Keranjang */}
+                {/* Tombol Masukkan Keranjang (Memicu Transisi Masuk Pemilihan Jumlah) */}
                 <button
                     type="button"
-                    onClick={handleAddToCart}
-                    className="flex items-center gap-1.5 rounded-xl border-2 border-blue-600 px-4 py-2 text-xs font-bold text-blue-600 transition hover:bg-blue-50 dark:border-blue-500 dark:text-blue-400 dark:hover:bg-blue-950/40 shadow-sm"
+                    onClick={() => openQuantityDrawer("cart")}
+                    className="group relative flex items-center gap-2 rounded-xl border-2 border-blue-600 px-4 py-2.5 text-xs font-bold text-blue-600 transition hover:bg-blue-50 hover:shadow-sm dark:border-blue-500 dark:text-blue-400 dark:hover:bg-blue-950/40"
+                    title="Atur jumlah dan simpan ke keranjang"
                 >
-                    <CartIcon size={16} />
+                    <CartIcon size={16} className="transition group-hover:scale-110" />
                     <span>+ Keranjang</span>
+                    {cartCount > 0 && (
+                        <span className="ml-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-black text-white">
+                            {cartCount}
+                        </span>
+                    )}
                 </button>
 
-                {/* Tombol Beli Sekarang */}
+                {/* Tombol Beli Sekarang (Memicu Transisi Masuk Pemilihan Jumlah & Checkout) */}
                 <button
                     type="button"
-                    onClick={handleBuyNow}
-                    className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-5 py-2 text-xs font-bold text-white shadow-md transition hover:bg-blue-700"
+                    onClick={() => openQuantityDrawer("buy")}
+                    className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-blue-500/20 transition hover:bg-blue-700 hover:shadow-lg active:scale-95"
+                    title="Atur jumlah dan beli sekarang"
                 >
                     <span>Beli Sekarang</span>
                     <ArrowRightIcon size={14} />
@@ -583,30 +602,247 @@ export const ProductDetailTopView: React.FC<ProductDetailTopViewProps> = ({ prod
             </aside>
 
             {/* Mobile Bottom Bar (Sticky di Kanan Bawah Layar Mobile) */}
-            <div className="fixed bottom-0 inset-x-0 z-40 flex items-center justify-between gap-2 border-t border-slate-200 bg-white/95 p-3 shadow-2xl backdrop-blur-md dark:border-white/10 dark:bg-slate-900/95 sm:hidden">
+            <div className="fixed bottom-0 inset-x-0 z-40 flex items-center justify-between gap-3 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-2xl backdrop-blur-md dark:border-white/10 dark:bg-slate-900/95 sm:hidden">
                 <div className="flex flex-col">
-                    <span className="text-[10px] text-slate-400">Total Harga</span>
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
+                        Harga Satuan
+                    </span>
                     <span className="text-sm font-black text-blue-600 dark:text-blue-400">
-                        {formatRupiah(product.price * quantity)}
+                        {formatRupiah(product.price)}
                     </span>
                 </div>
 
                 <div className="flex items-center gap-2">
                     <button
                         type="button"
-                        onClick={handleAddToCart}
-                        className="flex items-center gap-1 rounded-xl border-2 border-blue-600 px-3 py-2 text-xs font-bold text-blue-600 dark:border-blue-500 dark:text-blue-400"
+                        onClick={() => openQuantityDrawer("cart")}
+                        className="flex items-center gap-1.5 rounded-xl border-2 border-blue-600 px-3.5 py-2 text-xs font-bold text-blue-600 dark:border-blue-500 dark:text-blue-400"
                     >
                         <CartIcon size={15} />
                         <span>+ Keranjang</span>
                     </button>
                     <button
                         type="button"
-                        onClick={handleBuyNow}
-                        className="flex items-center gap-1 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow"
+                        onClick={() => openQuantityDrawer("buy")}
+                        className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow"
                     >
                         <span>Beli</span>
                         <ArrowRightIcon size={13} />
+                    </button>
+                </div>
+            </div>
+
+            {/* 5. INTERACTIVE QUANTITY DRAWER / MODAL DENGAN ANIMASI & TRANSISI MASUK */}
+            {/* Backdrop Blur */}
+            <div
+                className={`fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm transition-opacity duration-300 ${
+                    isQuantityDrawerOpen
+                        ? "opacity-100 pointer-events-auto"
+                        : "opacity-0 pointer-events-none"
+                }`}
+                onClick={closeQuantityDrawer}
+                aria-hidden="true"
+            />
+
+            {/* Sliding Panel: Bottom Sheet di Mobile, Popover / Modal Cantik di Desktop */}
+            <div
+                role="dialog"
+                aria-modal="true"
+                aria-label={drawerMode === "buy" ? "Atur Jumlah Pembelian" : "Atur Jumlah Keranjang"}
+                className={`fixed z-50 transition-all duration-300 ease-out 
+                    /* Mobile: Bottom sheet */
+                    inset-x-0 bottom-0 max-h-[88vh] overflow-y-auto rounded-t-3xl border-t border-slate-200 bg-white p-5 shadow-2xl dark:border-white/10 dark:bg-slate-900
+                    /* Desktop: Floating popover di kanan bawah */
+                    sm:inset-x-auto sm:bottom-6 sm:right-6 sm:w-[420px] sm:rounded-3xl sm:border sm:border-slate-200 dark:sm:border-white/10 sm:p-6
+                    ${
+                        isQuantityDrawerOpen
+                            ? "translate-y-0 opacity-100 scale-100"
+                            : "translate-y-full opacity-0 sm:translate-y-6 sm:scale-95 pointer-events-none"
+                    }
+                `}
+            >
+                {/* Mobile Handle Indicator */}
+                <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-slate-300 dark:bg-slate-700 sm:hidden" />
+
+                {/* Header Panel: Preview Singkat Produk & Tombol Tutup */}
+                <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-4 dark:border-white/5">
+                    <div className="flex items-center gap-3">
+                        <img
+                            src={images[0]}
+                            alt={product.name}
+                            className="h-16 w-16 shrink-0 rounded-xl border border-slate-200 object-cover object-center dark:border-white/10"
+                        />
+                        <div className="space-y-0.5">
+                            <span className="inline-block text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                                {drawerMode === "buy" ? "Beli Langsung" : "Tambah ke Keranjang"}
+                            </span>
+                            <h3 className="line-clamp-1 text-sm font-bold text-slate-900 dark:text-white">
+                                {product.name}
+                            </h3>
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm font-extrabold text-blue-600 dark:text-blue-400">
+                                    {formatRupiah(product.price)}
+                                </span>
+                                <span className="text-[11px] text-slate-400">
+                                    Stok: <strong className="font-semibold text-slate-700 dark:text-slate-300">{maxStock}</strong>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={closeQuantityDrawer}
+                        className="rounded-full p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white"
+                        title="Tutup dialog"
+                    >
+                        <CloseIcon size={18} />
+                    </button>
+                </div>
+
+                {/* Section: Atur Jumlah Barang (Stepper & Shortcut Pills) */}
+                <div className="py-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <span className="text-xs font-bold text-slate-900 dark:text-white">
+                                Jumlah Barang
+                            </span>
+                            <p className="text-[11px] text-slate-400">
+                                Sesuaikan banyak produk yang ingin Anda pesan
+                            </p>
+                        </div>
+
+                        {/* Interactive Quantity Stepper */}
+                        <div className="flex items-center rounded-2xl border border-slate-200 bg-slate-50 p-1 dark:border-white/10 dark:bg-white/5">
+                            <button
+                                type="button"
+                                disabled={quantity <= 1}
+                                onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                                className="flex h-8 w-8 items-center justify-center rounded-xl bg-white text-slate-700 shadow-sm transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                                title="Kurangi 1"
+                            >
+                                <MinusIcon size={14} />
+                            </button>
+                            <input
+                                type="number"
+                                min={1}
+                                max={maxStock}
+                                value={quantity}
+                                onChange={(e) => {
+                                    const val = parseInt(e.target.value, 10);
+                                    if (isNaN(val)) setQuantity(1);
+                                    else setQuantity(Math.max(1, Math.min(maxStock, val)));
+                                }}
+                                className="w-12 text-center text-sm font-black text-slate-900 bg-transparent focus:outline-none dark:text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                            <button
+                                type="button"
+                                disabled={quantity >= maxStock}
+                                onClick={() => setQuantity((q) => Math.min(maxStock, q + 1))}
+                                className="flex h-8 w-8 items-center justify-center rounded-xl bg-white text-slate-700 shadow-sm transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                                title="Tambah 1"
+                            >
+                                <PlusIcon size={14} />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Quick Preset Shortcut Pills (+1, +2, +5, +10, Maksimal) */}
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                        <span className="text-[11px] text-slate-400 pr-1">Pilihan Cepat:</span>
+                        {[1, 2, 5, 10].map((preset) => {
+                            if (preset > maxStock) return null;
+                            const isSelected = quantity === preset;
+                            return (
+                                <button
+                                    key={preset}
+                                    type="button"
+                                    onClick={() => setQuantity(preset)}
+                                    className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+                                        isSelected
+                                            ? "bg-blue-600 text-white shadow-sm"
+                                            : "border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
+                                    }`}
+                                >
+                                    {preset}
+                                </button>
+                            );
+                        })}
+                        <button
+                            type="button"
+                            onClick={() => setQuantity(maxStock)}
+                            className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+                                quantity === maxStock
+                                    ? "bg-blue-600 text-white shadow-sm"
+                                    : "border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
+                            }`}
+                        >
+                            Maks ({maxStock})
+                        </button>
+                    </div>
+
+                    {/* Catatan untuk Penjual (Opsional) */}
+                    <div className="pt-2">
+                        <label className="mb-1 block text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                            Catatan untuk Penjual (Opsional)
+                        </label>
+                        <input
+                            type="text"
+                            value={orderNote}
+                            onChange={(e) => setOrderNote(e.target.value)}
+                            placeholder="Contoh: warna hitam, ukuran L, packing bubble wrap"
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 placeholder-slate-400 transition focus:border-blue-500 focus:bg-white focus:outline-none dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:placeholder-slate-500 dark:focus:border-blue-400"
+                        />
+                    </div>
+                </div>
+
+                {/* Subtotal & Rincian Ringkas */}
+                <div className="border-t border-slate-100 pt-3 dark:border-white/5">
+                    <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
+                        <span>Subtotal ({quantity} barang)</span>
+                        <span>{formatRupiah(product.price * quantity)}</span>
+                    </div>
+                    {disc > 0 && (
+                        <div className="flex items-center justify-between text-xs text-rose-600 dark:text-rose-400 font-semibold mb-1">
+                            <span>Hemat Diskon</span>
+                            <span>- {formatRupiah((product.originalPrice - product.price) * quantity)}</span>
+                        </div>
+                    )}
+                    <div className="flex items-center justify-between pt-1">
+                        <span className="text-xs font-bold text-slate-900 dark:text-white">
+                            Total Pembayaran
+                        </span>
+                        <span className="text-lg font-black text-blue-600 dark:text-blue-400">
+                            {formatRupiah(product.price * quantity)}
+                        </span>
+                    </div>
+                </div>
+
+                {/* Action Buttons: Konfirmasi vs Batal */}
+                <div className="mt-4 flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={closeQuantityDrawer}
+                        className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-700 transition hover:bg-slate-100 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5"
+                    >
+                        Batal
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleConfirmAction}
+                        className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-blue-500/20 transition hover:bg-blue-700 hover:shadow-lg active:scale-95"
+                    >
+                        {drawerMode === "buy" ? (
+                            <>
+                                <span>Konfirmasi Beli ({quantity})</span>
+                                <ArrowRightIcon size={14} />
+                            </>
+                        ) : (
+                            <>
+                                <CartIcon size={16} />
+                                <span>Masuk Keranjang ({quantity})</span>
+                            </>
+                        )}
                     </button>
                 </div>
             </div>
