@@ -1,3 +1,19 @@
+export type ProductVariantOption = {
+    id: string;
+    label: string;
+    priceDelta?: number; // Tambahan harga bila varian tertentu lebih mahal (contoh: +Rp25.000)
+    stock?: number;
+    colorHex?: string; // Hex color untuk dot visual warna (contoh: #0f172a, #ffffff, #b91c1c)
+    image?: string; // Foto varian khusus jika ada
+};
+
+export type ProductVariantGroup = {
+    id: string; // "warna", "ukuran", "tipe", "kapasitas"
+    name: string; // "Pilihan Warna", "Ukuran", "Pilihan Edisi", dll
+    type?: "color" | "size" | "text";
+    options: ProductVariantOption[];
+};
+
 export type MarketplaceProduct = {
     id: string;
     name: string;
@@ -22,6 +38,7 @@ export type MarketplaceProduct = {
     sellerRating?: number;
     sellerProductsCount?: number;
     sellerResponseTime?: string;
+    variantGroups?: ProductVariantGroup[];
 };
 
 export const HOME_BANNERS = [
@@ -169,6 +186,27 @@ Produk ini bergaransi resmi distributor selama 12 bulan dengan fasilitas penggan
             "https://images.unsplash.com/photo-1484704849700-f032a568e944?auto=format&fit=crop&w=1000&q=80",
         ],
         tags: ["Gaming", "7.1 Surround", "Official Store"],
+        variantGroups: [
+            {
+                id: "warna",
+                name: "Pilihan Warna",
+                type: "color",
+                options: [
+                    { id: "black", label: "Matte Black", colorHex: "#0f172a", stock: 12 },
+                    { id: "white", label: "Arctic White", colorHex: "#f8fafc", stock: 8 },
+                    { id: "neon", label: "Cyber Red", colorHex: "#e11d48", stock: 6, priceDelta: 15000 },
+                ],
+            },
+            {
+                id: "edisi",
+                name: "Paket Audio",
+                type: "text",
+                options: [
+                    { id: "std", label: "Standard 3.5mm", stock: 15 },
+                    { id: "pro", label: "7.1 Surround USB", stock: 10, priceDelta: 25000 },
+                ],
+            },
+        ],
     },
     {
         id: "fs-2",
@@ -680,6 +718,29 @@ Dapat dicuci menggunakan mesin cuci putaran normal dengan air dingin atau suhu r
             "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=1000&q=80",
         ],
         tags: ["Katun Flanel", "Casual", "Lokal"],
+        variantGroups: [
+            {
+                id: "warna",
+                name: "Pilihan Warna / Motif",
+                type: "color",
+                options: [
+                    { id: "red-black", label: "Merah Kotak", colorHex: "#881337", stock: 18 },
+                    { id: "navy", label: "Navy Tartan", colorHex: "#1e3a8a", stock: 15 },
+                    { id: "emerald", label: "Forest Green", colorHex: "#064e3b", stock: 17 },
+                ],
+            },
+            {
+                id: "ukuran",
+                name: "Pilihan Ukuran",
+                type: "size",
+                options: [
+                    { id: "m", label: "M", stock: 15 },
+                    { id: "l", label: "L", stock: 20 },
+                    { id: "xl", label: "XL", stock: 10 },
+                    { id: "xxl", label: "XXL", stock: 5, priceDelta: 10000 },
+                ],
+            },
+        ],
     },
     {
         id: "fy-18",
@@ -701,6 +762,7 @@ Dapat dicuci menggunakan mesin cuci putaran normal dengan air dingin atau suhu r
             "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?auto=format&fit=crop&w=1000&q=80",
         ],
         tags: ["Bluetooth 5.3", "IPX5", "Baru"],
+        variantGroups: [], // Produk ini tidak memiliki varian tambahan (toko hanya menjual 1 varian standar)
     },
 ];
 
@@ -756,4 +818,348 @@ export function getSellerInfo(product: MarketplaceProduct) {
         productsCount: product.sellerProductsCount || 124,
         responseTime: product.sellerResponseTime || "Hitungan menit",
     };
+}
+
+export function getProductVariantGroups(product: MarketplaceProduct): ProductVariantGroup[] {
+    // 1. Jika toko eksplisit mengatur variantGroups (termasuk [] bila tidak ada varian sama sekali)
+    if (product.variantGroups !== undefined) {
+        return product.variantGroups;
+    }
+
+    // 2. Default fallback cerdas berdasarkan kategori produk jika belum ditentukan di mock data
+    if (product.category === "fashion") {
+        return [
+            {
+                id: "warna",
+                name: "Pilihan Warna",
+                type: "color",
+                options: [
+                    { id: "hitam", label: "Hitam", colorHex: "#0f172a", stock: 15 },
+                    { id: "putih", label: "Putih", colorHex: "#f8fafc", stock: 12 },
+                    { id: "navy", label: "Navy", colorHex: "#1e3a8a", stock: 10 },
+                ],
+            },
+            {
+                id: "ukuran",
+                name: "Pilihan Ukuran",
+                type: "size",
+                options: [
+                    { id: "s", label: "S", stock: 8 },
+                    { id: "m", label: "M", stock: 15 },
+                    { id: "l", label: "L", stock: 12 },
+                    { id: "xl", label: "XL", stock: 6, priceDelta: 10000 },
+                ],
+            },
+        ];
+    }
+
+    if (product.category === "elektronik") {
+        return [
+            {
+                id: "warna",
+                name: "Pilihan Warna",
+                type: "color",
+                options: [
+                    { id: "black", label: "Black", colorHex: "#0f172a", stock: 10 },
+                    { id: "silver", label: "Silver", colorHex: "#cbd5e1", stock: 8 },
+                ],
+            },
+        ];
+    }
+
+    // Kategori umum secara default tidak memiliki varian tambahan (1 varian standar)
+    return [];
+}
+
+// ---------------------------------------------------------------------------
+// Store / Toko Profiles & Product Catalog Helpers
+// ---------------------------------------------------------------------------
+
+export function slugifyStore(name: string): string {
+    return name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "");
+}
+
+export type StoreProfile = {
+    slug: string;
+    name: string;
+    isMall: boolean;
+    avatar: string;
+    banner: string;
+    description: string;
+    rating: number;
+    reviewsCount: number;
+    productsCount: number;
+    location: string;
+    joinedDate: string;
+    responseTime: string;
+    followersCount: number;
+    customCategories: string[];
+};
+
+export const STORE_PROFILES: Record<string, StoreProfile> = {
+    "techhub-official": {
+        slug: "techhub-official",
+        name: "TechHub Official",
+        isMall: true,
+        avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
+        banner: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=1600&q=80",
+        description: "Official Flagship Store distributor resmi perlengkapan audio, gaming gear, dan aksesoris teknologi premium bersertifikasi di Indonesia. Jaminan 100% Produk Original Mall dengan garansi distributor 12 bulan.",
+        rating: 4.9,
+        reviewsCount: 3820,
+        productsCount: 184,
+        location: "Jakarta Barat",
+        joinedDate: "Bergabung Maret 2022",
+        responseTime: "Hitungan menit",
+        followersCount: 48200,
+        customCategories: ["Semua Produk", "Audio & Headset", "Aksesoris Gaming", "Keyboard & Mouse", "Promo Toko"],
+    },
+    "flannel-house": {
+        slug: "flannel-house",
+        name: "Flannel House",
+        isMall: false,
+        avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80",
+        banner: "https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?auto=format&fit=crop&w=1600&q=80",
+        description: "Brand apparel kasual lokal asal Surakarta yang memproduksi kemeja flanel katun 100% lembut, outer hangat, dan pakaian harian berkualitas dengan jahitan dobel presisi.",
+        rating: 4.8,
+        reviewsCount: 412,
+        productsCount: 38,
+        location: "Surakarta",
+        joinedDate: "Bergabung Agustus 2023",
+        responseTime: "1 jam",
+        followersCount: 9350,
+        customCategories: ["Semua Produk", "Kemeja Flanel", "Outer & Jaket", "Kaos Polos & Motif", "Diskon Cuci Gudang"],
+    },
+    "soundwave-id": {
+        slug: "soundwave-id",
+        name: "SoundWave ID",
+        isMall: false,
+        avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80",
+        banner: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=1600&q=80",
+        description: "Pusat speaker bluetooth portable, TWS nirkabel, dan perangkat audio bass booster bersertifikasi tahan air untuk menemani aktivitas harian, outdoor, dan olahraga.",
+        rating: 4.7,
+        reviewsCount: 890,
+        productsCount: 64,
+        location: "Jakarta Utara",
+        joinedDate: "Bergabung November 2022",
+        responseTime: "15 menit",
+        followersCount: 15200,
+        customCategories: ["Semua Produk", "Speaker Bluetooth", "TWS Earphone", "Aksesoris Audio", "Paket Bundling"],
+    },
+};
+
+export function getStoreProfile(slugOrName: string): StoreProfile {
+    const slug = slugifyStore(slugOrName);
+    if (STORE_PROFILES[slug]) {
+        return STORE_PROFILES[slug];
+    }
+
+    // Cari dari ALL_PRODUCTS jika belum terdaftar statis
+    const matchedProduct = ALL_PRODUCTS.find(
+        (p) => slugifyStore(p.store) === slug || p.store.toLowerCase() === slugOrName.toLowerCase()
+    );
+
+    const isMall = matchedProduct?.isMall || matchedProduct?.badge === "Mall" || false;
+    const name = matchedProduct?.store || slugOrName.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+    return {
+        slug,
+        name,
+        isMall,
+        avatar: matchedProduct?.sellerAvatar || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80",
+        banner: isMall
+            ? "https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=1600&q=80"
+            : "https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?auto=format&fit=crop&w=1600&q=80",
+        description: `${name} adalah toko terpercaya di NextShopID yang menyediakan berbagai produk berkualitas dengan harga bersaing dan jaminan pelayanan terbaik.`,
+        rating: matchedProduct?.sellerRating || 4.8,
+        reviewsCount: 520,
+        productsCount: matchedProduct?.sellerProductsCount || 45,
+        location: matchedProduct?.location || "Jakarta",
+        joinedDate: "Bergabung 2023",
+        responseTime: matchedProduct?.sellerResponseTime || "Hitungan menit",
+        followersCount: isMall ? 32000 : 8500,
+        customCategories: ["Semua Produk", "Produk Unggulan", "Koleksi Terbaru", "Diskon Toko"],
+    };
+}
+
+export function getStoreProducts(storeSlugOrName: string): MarketplaceProduct[] {
+    const profile = getStoreProfile(storeSlugOrName);
+    const storeSlug = profile.slug;
+
+    // Filter produk yang ada di ALL_PRODUCTS yang tokonya cocok
+    const directProducts = ALL_PRODUCTS.filter((p) => slugifyStore(p.store) === storeSlug);
+
+    // Jika toko memiliki produk tambahan spesifik toko untuk mengisi customCategories
+    if (storeSlug === "techhub-official") {
+        const extraTechHub: MarketplaceProduct[] = [
+            {
+                id: "th-1",
+                name: "Keyboard Mechanical RGB Blue Switch Tenkeyless",
+                price: 249000,
+                originalPrice: 499000,
+                sold: 840,
+                rating: 4.9,
+                location: "Jakarta Barat",
+                store: "TechHub Official",
+                isMall: true,
+                category: "elektronik",
+                description: "Keyboard mechanical RGB tenkeyless dengan switch biru responsif dan keycaps anti-fading.",
+                stock: 45,
+                reviewsCount: 310,
+                badge: "Mall",
+                accent: "from-blue-600 to-indigo-800",
+                image: "https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=800&q=80",
+                tags: ["Keyboard", "Mechanical", "RGB"],
+            },
+            {
+                id: "th-2",
+                name: "Mouse Gaming Wireless 16000 DPI Ultra Lightweight 68g",
+                price: 179000,
+                originalPrice: 320000,
+                sold: 1200,
+                rating: 4.8,
+                location: "Jakarta Barat",
+                store: "TechHub Official",
+                isMall: true,
+                category: "elektronik",
+                description: "Mouse gaming nirkabel sensor optik presisi tinggi 16000 DPI dengan bobot ringan hanya 68 gram.",
+                stock: 30,
+                reviewsCount: 520,
+                badge: "Mall",
+                accent: "from-purple-600 to-indigo-900",
+                image: "https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?auto=format&fit=crop&w=800&q=80",
+                tags: ["Mouse Gaming", "Wireless", "RGB"],
+            },
+            {
+                id: "th-3",
+                name: "TWS Earbuds ANC Active Noise Cancelling Low Latency",
+                price: 189000,
+                originalPrice: 389000,
+                sold: 650,
+                rating: 4.8,
+                location: "Jakarta Barat",
+                store: "TechHub Official",
+                isMall: true,
+                category: "elektronik",
+                description: "Earphone nirkabel TWS dengan peredam bising aktif ANC dan mode low latency gaming 40ms.",
+                stock: 25,
+                reviewsCount: 240,
+                badge: "Mall",
+                accent: "from-sky-600 to-blue-800",
+                image: "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=800&q=80",
+                tags: ["TWS", "ANC", "Wireless"],
+            },
+            {
+                id: "th-4",
+                name: "Mousepad Gaming Deskmat Speed 90x40cm Jahit Tepi",
+                price: 49000,
+                originalPrice: 99000,
+                sold: 2100,
+                rating: 4.9,
+                location: "Jakarta Barat",
+                store: "TechHub Official",
+                isMall: true,
+                category: "elektronik",
+                description: "Deskmat jumbo 90x40cm bahan micro-woven cloth halus dengan jahit tepi anti-koyak.",
+                stock: 80,
+                reviewsCount: 880,
+                badge: "Mall",
+                accent: "from-slate-700 to-slate-900",
+                image: "https://images.unsplash.com/photo-1629429408209-1f912961dbd8?auto=format&fit=crop&w=800&q=80",
+                tags: ["Deskmat", "Gaming", "Aksesoris"],
+            },
+            {
+                id: "th-5",
+                name: "Headphone Stand RGB dengan Dual USB Fast Hub",
+                price: 79000,
+                originalPrice: 159000,
+                sold: 430,
+                rating: 4.7,
+                location: "Jakarta Barat",
+                store: "TechHub Official",
+                isMall: true,
+                category: "elektronik",
+                description: "Penyangga headphone estetik dengan lampu RGB dinamis dan 2 port USB hub.",
+                stock: 20,
+                reviewsCount: 160,
+                badge: "Mall",
+                accent: "from-blue-600 to-violet-800",
+                image: "https://images.unsplash.com/photo-1546435770-a3e426bf472b?auto=format&fit=crop&w=800&q=80",
+                tags: ["Stand", "RGB", "USB Hub"],
+            },
+        ];
+
+        return [...directProducts, ...extraTechHub];
+    }
+
+    if (storeSlug === "flannel-house") {
+        const extraFlannel: MarketplaceProduct[] = [
+            {
+                id: "fh-1",
+                name: "Kemeja Flanel Katun Pria Lengan Pendek Kasual Modern",
+                price: 79000,
+                originalPrice: 129000,
+                sold: 62,
+                rating: 4.8,
+                location: "Surakarta",
+                store: "Flannel House",
+                isMall: false,
+                category: "fashion",
+                description: "Kemeja flanel lengan pendek cocok untuk iklim tropis dengan motif tartan modern.",
+                stock: 35,
+                reviewsCount: 42,
+                badge: "Lokal",
+                accent: "from-amber-700 to-stone-900",
+                image: "https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&w=800&q=80",
+                tags: ["Flanel Pendek", "Katun", "Lokal"],
+            },
+            {
+                id: "fh-2",
+                name: "Jaket Trucker Canvas Flanel Warm Fleece Lining",
+                price: 189000,
+                originalPrice: 299000,
+                sold: 48,
+                rating: 4.9,
+                location: "Surakarta",
+                store: "Flannel House",
+                isMall: false,
+                category: "fashion",
+                description: "Jaket canvas tebal dengan lapisan dalam bulu fleece motif flanel yang hangat dan maskulin.",
+                stock: 20,
+                reviewsCount: 30,
+                badge: "Lokal",
+                accent: "from-amber-800 to-stone-900",
+                image: "https://images.unsplash.com/photo-1544441893-675973e31985?auto=format&fit=crop&w=800&q=80",
+                tags: ["Jaket", "Fleece", "Lokal"],
+            },
+            {
+                id: "fh-3",
+                name: "Kaos Polos Heavyweight Cotton 24s Regular Fit",
+                price: 49000,
+                originalPrice: 85000,
+                sold: 140,
+                rating: 4.8,
+                location: "Surakarta",
+                store: "Flannel House",
+                isMall: false,
+                category: "fashion",
+                description: "Kaos oblong katun combed 24s heavyweight tebal, tidak nerawang, dan nyaman untuk inner flanel.",
+                stock: 50,
+                reviewsCount: 88,
+                badge: "Lokal",
+                accent: "from-slate-700 to-stone-900",
+                image: "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80",
+                tags: ["Kaos Polos", "Cotton 24s", "Lokal"],
+            },
+        ];
+        return [...directProducts, ...extraFlannel];
+    }
+
+    if (directProducts.length > 0) {
+        return directProducts;
+    }
+
+    return ALL_PRODUCTS.slice(0, 6);
 }

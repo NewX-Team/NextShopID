@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
+    ArrowLeftIcon,
     ArrowRightIcon,
     BadgeCheckIcon,
     CartIcon,
@@ -17,6 +18,7 @@ import {
     HeartIcon,
     LocationIcon,
     MinusIcon,
+    PackageIcon,
     PlusIcon,
     ShareIcon,
     ShieldIcon,
@@ -29,8 +31,12 @@ import {
     formatRupiah,
     formatSold,
     getProductImages,
+    getProductVariantGroups,
     getSellerInfo,
+    slugifyStore,
     type MarketplaceProduct,
+    type ProductVariantGroup,
+    type ProductVariantOption,
 } from "@/data/marketplace";
 
 interface ProductDetailTopViewProps {
@@ -40,6 +46,7 @@ interface ProductDetailTopViewProps {
 export const ProductDetailTopView: React.FC<ProductDetailTopViewProps> = ({ product }) => {
     const images = useMemo(() => getProductImages(product), [product]);
     const seller = useMemo(() => getSellerInfo(product), [product]);
+    const variantGroups = useMemo(() => getProductVariantGroups(product), [product]);
 
     const [activeImageIndex, setActiveImageIndex] = useState(0);
     const [isLightboxOpen, setIsLightboxOpen] = useState(false);
@@ -51,16 +58,66 @@ export const ProductDetailTopView: React.FC<ProductDetailTopViewProps> = ({ prod
     const [cartCount, setCartCount] = useState(0);
     const [toastMessage, setToastMessage] = useState<{ title: string; desc: string } | null>(null);
 
+    // Product Variant state: mapping of groupId -> optionId
+    const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>(() => {
+        const initial: Record<string, string> = {};
+        const groups = getProductVariantGroups(product);
+        groups.forEach((g) => {
+            if (g.options.length > 0) {
+                initial[g.id] = g.options[0].id;
+            }
+        });
+        return initial;
+    });
+
+    // Update selected variants if product changes
+    useEffect(() => {
+        const initial: Record<string, string> = {};
+        variantGroups.forEach((g) => {
+            if (g.options.length > 0) {
+                initial[g.id] = g.options[0].id;
+            }
+        });
+        setSelectedVariants(initial);
+    }, [variantGroups]);
+
+    // Calculate price delta from selected variants
+    const variantPriceDelta = useMemo(() => {
+        let delta = 0;
+        variantGroups.forEach((group) => {
+            const selectedId = selectedVariants[group.id];
+            const opt = group.options.find((o) => o.id === selectedId);
+            if (opt?.priceDelta) {
+                delta += opt.priceDelta;
+            }
+        });
+        return delta;
+    }, [variantGroups, selectedVariants]);
+
+    // Effective unit price including selected variants
+    const effectivePrice = product.price + variantPriceDelta;
+    const effectiveOriginalPrice = product.originalPrice ? product.originalPrice + variantPriceDelta : 0;
+    const disc = discountPercent(effectivePrice, effectiveOriginalPrice);
+    const maxStock = product.stock || 25;
+
+    // Summary of chosen variants (e.g. "Matte Black • 7.1 Surround Pro")
+    const selectedVariantsSummary = useMemo(() => {
+        if (variantGroups.length === 0) return "";
+        return variantGroups
+            .map((g) => {
+                const opt = g.options.find((o) => o.id === selectedVariants[g.id]);
+                return opt?.label;
+            })
+            .filter(Boolean)
+            .join(" • ");
+    }, [variantGroups, selectedVariants]);
+
     // Interactive Quantity Drawer & Purchase Mode state
     const [isQuantityDrawerOpen, setIsQuantityDrawerOpen] = useState(false);
     const [drawerMode, setDrawerMode] = useState<"buy" | "cart">("buy");
-    const [orderNote, setOrderNote] = useState("");
 
     // Description expand / collapse state
     const [isDescExpanded, setIsDescExpanded] = useState(false);
-
-    const disc = discountPercent(product.price, product.originalPrice);
-    const maxStock = product.stock || 25;
 
     // Toast auto dismiss
     useEffect(() => {
@@ -114,16 +171,17 @@ export const ProductDetailTopView: React.FC<ProductDetailTopViewProps> = ({ prod
     };
 
     const handleConfirmAction = () => {
+        const variantText = selectedVariantsSummary ? ` (${selectedVariantsSummary})` : "";
         if (drawerMode === "cart") {
             setCartCount((c) => c + quantity);
             setToastMessage({
                 title: "Berhasil Ditambahkan ke Keranjang",
-                desc: `${quantity}x "${product.name.slice(0, 30)}..." telah ditambahkan ke keranjang belanja. Total: ${formatRupiah(product.price * quantity)}`,
+                desc: `${quantity}x "${product.name.slice(0, 26)}..."${variantText} telah ditambahkan ke keranjang belanja. Total: ${formatRupiah(effectivePrice * quantity)}`,
             });
         } else {
             setToastMessage({
                 title: "Melanjutkan Pembelian",
-                desc: `Memproses pembelian ${quantity}x "${product.name.slice(0, 30)}..." (${formatRupiah(product.price * quantity)}) ke checkout pembayaran.`,
+                desc: `Memproses pembelian ${quantity}x "${product.name.slice(0, 26)}..."${variantText} (${formatRupiah(effectivePrice * quantity)}) ke checkout pembayaran.`,
             });
         }
         setIsQuantityDrawerOpen(false);
@@ -137,27 +195,41 @@ export const ProductDetailTopView: React.FC<ProductDetailTopViewProps> = ({ prod
 
     return (
         <section className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8 pb-32">
-            {/* Top Navigation & Breadcrumbs */}
+            {/* Top Navigation & Breadcrumbs dengan Tombol Kembali ke Page Utama */}
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3 text-xs">
-                <nav className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
+                <div className="flex flex-wrap items-center gap-3">
+                    {/* Tombol Back ke Page Utama (Beranda) */}
                     <Link
                         href="/"
-                        className="font-medium transition hover:text-blue-600 dark:hover:text-blue-400"
+                        className="group inline-flex items-center gap-1.5 rounded-xl border border-slate-200/90 bg-white px-3 py-1.5 font-bold text-slate-700 shadow-sm transition hover:border-blue-400 hover:bg-blue-50/70 hover:text-blue-600 dark:border-white/10 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-blue-500 dark:hover:bg-blue-950/40 dark:hover:text-blue-400"
+                        title="Kembali ke Beranda Utama"
                     >
-                        Beranda
+                        <ArrowLeftIcon size={14} className="transition group-hover:-translate-x-0.5" />
+                        <span>Kembali ke Beranda</span>
                     </Link>
-                    <span>/</span>
-                    <Link
-                        href="/katalog"
-                        className="capitalize font-medium transition hover:text-blue-600 dark:hover:text-blue-400"
-                    >
-                        {product.category || "Katalog"}
-                    </Link>
-                    <span>/</span>
-                    <span className="truncate max-w-[200px] sm:max-w-xs font-semibold text-slate-800 dark:text-slate-200">
-                        {product.name}
-                    </span>
-                </nav>
+
+                    <div className="hidden sm:block h-4 w-px bg-slate-200 dark:bg-white/10" />
+
+                    <nav className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
+                        <Link
+                            href="/"
+                            className="font-medium transition hover:text-blue-600 dark:hover:text-blue-400"
+                        >
+                            Beranda
+                        </Link>
+                        <span>/</span>
+                        <Link
+                            href="/katalog"
+                            className="capitalize font-medium transition hover:text-blue-600 dark:hover:text-blue-400"
+                        >
+                            {product.category || "Katalog"}
+                        </Link>
+                        <span>/</span>
+                        <span className="truncate max-w-[140px] sm:max-w-xs font-semibold text-slate-800 dark:text-slate-200">
+                            {product.name}
+                        </span>
+                    </nav>
+                </div>
 
                 <div className="flex items-center gap-2">
                     <button
@@ -304,10 +376,14 @@ export const ProductDetailTopView: React.FC<ProductDetailTopViewProps> = ({ prod
                 <div className="mt-6 space-y-2 border-t border-slate-100 pt-5 dark:border-white/5">
                     {/* Header Store & Category Tag */}
                     <div className="flex flex-wrap items-center gap-2 text-xs">
-                        <span className="inline-flex items-center gap-1 font-bold text-blue-600 dark:text-blue-400">
+                        <Link
+                            href={`/toko/${slugifyStore(product.store)}`}
+                            className="inline-flex items-center gap-1 font-bold text-blue-600 transition hover:underline dark:text-blue-400"
+                            title={`Kunjungi profil toko ${product.store}`}
+                        >
                             <StoreIcon size={14} />
-                            {product.store}
-                        </span>
+                            <span>{product.store}</span>
+                        </Link>
                         <span className="text-slate-300 dark:text-slate-600">•</span>
                         <span className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
                             <LocationIcon size={13} />
@@ -403,13 +479,14 @@ export const ProductDetailTopView: React.FC<ProductDetailTopViewProps> = ({ prod
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     {/* Profil Penjual (Kiri) */}
                     <div className="flex items-center gap-4">
-                        {/* Profile Avatar:
-                            - Jika status Mall: Menggunakan border squircle resmi (modern rounded-2xl dengan subtle dual-ring rose & floating badge MALL di sudut kanan bawah, tanpa menutupi wajah profil)
-                            - Jika belum verifikasi: Tampilan standar natural (rounded-2xl border slate tanpa border merah atau badge)
-                        */}
-                        <div className="relative shrink-0">
+                        {/* Profile Avatar: Klik untuk masuk ke profil toko */}
+                        <Link
+                            href={`/toko/${slugifyStore(seller.store)}`}
+                            className="relative shrink-0 group block"
+                            title={`Kunjungi toko ${seller.store}`}
+                        >
                             <div
-                                className={`relative h-14 w-14 sm:h-16 sm:w-16 rounded-2xl transition-all ${
+                                className={`relative h-14 w-14 sm:h-16 sm:w-16 rounded-2xl transition-all group-hover:scale-105 ${
                                     seller.isMall
                                         ? "p-[2.5px] bg-gradient-to-br from-rose-500 via-rose-600 to-red-600 shadow-lg shadow-rose-500/20 ring-2 ring-rose-500/30"
                                         : "p-[1.5px] bg-slate-200 dark:bg-slate-700 shadow-sm"
@@ -433,14 +510,20 @@ export const ProductDetailTopView: React.FC<ProductDetailTopViewProps> = ({ prod
                                     Mall
                                 </span>
                             )}
-                        </div>
+                        </Link>
 
                         {/* Nama Toko & Status */}
                         <div className="space-y-1">
                             <div className="flex items-center gap-2">
-                                <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
-                                    {seller.store}
-                                </h3>
+                                <Link
+                                    href={`/toko/${slugifyStore(seller.store)}`}
+                                    className="group/name flex items-center gap-1.5"
+                                    title={`Kunjungi toko ${seller.store}`}
+                                >
+                                    <h3 className="text-base sm:text-lg font-bold text-slate-900 transition group-hover/name:text-blue-600 group-hover/name:underline dark:text-white dark:group-hover/name:text-blue-400">
+                                        {seller.store}
+                                    </h3>
+                                </Link>
 
                                 {/* Centang Berwarna Merah Jika Status Mall */}
                                 {seller.isMall ? (
@@ -492,11 +575,11 @@ export const ProductDetailTopView: React.FC<ProductDetailTopViewProps> = ({ prod
                     {/* Tombol Aksi Toko (Kanan) */}
                     <div className="flex items-center gap-2 pt-2 sm:pt-0">
                         <Link
-                            href="/katalog"
-                            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-white/10 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                            href={`/toko/${slugifyStore(seller.store)}`}
+                            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:border-blue-300 hover:bg-slate-50 hover:text-blue-600 dark:border-white/10 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:hover:text-blue-400"
                         >
                             <StoreIcon size={14} />
-                            Kunjungi Toko
+                            <span>Kunjungi Toko</span>
                         </Link>
                     </div>
                 </div>
@@ -569,16 +652,21 @@ export const ProductDetailTopView: React.FC<ProductDetailTopViewProps> = ({ prod
                         )}
                     </div>
                     <span className="text-base font-black tracking-tight text-blue-600 dark:text-blue-400">
-                        {formatRupiah(product.price)}
+                        {formatRupiah(effectivePrice)}
                     </span>
+                    {selectedVariantsSummary && (
+                        <span className="truncate max-w-[170px] text-[10px] font-medium text-slate-500 dark:text-slate-400" title={selectedVariantsSummary}>
+                            {selectedVariantsSummary}
+                        </span>
+                    )}
                 </div>
 
-                {/* Tombol Masukkan Keranjang (Memicu Transisi Masuk Pemilihan Jumlah) */}
+                {/* Tombol Masukkan Keranjang (Memicu Transisi Masuk Pemilihan Varian & Jumlah) */}
                 <button
                     type="button"
                     onClick={() => openQuantityDrawer("cart")}
                     className="group relative flex items-center gap-2 rounded-xl border-2 border-blue-600 px-4 py-2.5 text-xs font-bold text-blue-600 transition hover:bg-blue-50 hover:shadow-sm dark:border-blue-500 dark:text-blue-400 dark:hover:bg-blue-950/40"
-                    title="Atur jumlah dan simpan ke keranjang"
+                    title="Atur varian & jumlah, lalu simpan ke keranjang"
                 >
                     <CartIcon size={16} className="transition group-hover:scale-110" />
                     <span>+ Keranjang</span>
@@ -589,12 +677,12 @@ export const ProductDetailTopView: React.FC<ProductDetailTopViewProps> = ({ prod
                     )}
                 </button>
 
-                {/* Tombol Beli Sekarang (Memicu Transisi Masuk Pemilihan Jumlah & Checkout) */}
+                {/* Tombol Beli Sekarang (Memicu Transisi Masuk Pemilihan Varian & Jumlah) */}
                 <button
                     type="button"
                     onClick={() => openQuantityDrawer("buy")}
                     className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-blue-500/20 transition hover:bg-blue-700 hover:shadow-lg active:scale-95"
-                    title="Atur jumlah dan beli sekarang"
+                    title="Pilih varian dan beli sekarang"
                 >
                     <span>Beli Sekarang</span>
                     <ArrowRightIcon size={14} />
@@ -603,13 +691,18 @@ export const ProductDetailTopView: React.FC<ProductDetailTopViewProps> = ({ prod
 
             {/* Mobile Bottom Bar (Sticky di Kanan Bawah Layar Mobile) */}
             <div className="fixed bottom-0 inset-x-0 z-40 flex items-center justify-between gap-3 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-2xl backdrop-blur-md dark:border-white/10 dark:bg-slate-900/95 sm:hidden">
-                <div className="flex flex-col">
+                <div className="flex flex-col max-w-[130px]">
                     <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
                         Harga Satuan
                     </span>
                     <span className="text-sm font-black text-blue-600 dark:text-blue-400">
-                        {formatRupiah(product.price)}
+                        {formatRupiah(effectivePrice)}
                     </span>
+                    {selectedVariantsSummary && (
+                        <span className="truncate text-[9px] text-slate-500 dark:text-slate-400">
+                            {selectedVariantsSummary}
+                        </span>
+                    )}
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -632,7 +725,7 @@ export const ProductDetailTopView: React.FC<ProductDetailTopViewProps> = ({ prod
                 </div>
             </div>
 
-            {/* 5. INTERACTIVE QUANTITY DRAWER / MODAL DENGAN ANIMASI & TRANSISI MASUK */}
+            {/* 5. INTERACTIVE QUANTITY & VARIANT DRAWER / MODAL DENGAN ANIMASI & TRANSISI MASUK */}
             {/* Backdrop Blur */}
             <div
                 className={`fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm transition-opacity duration-300 ${
@@ -648,12 +741,12 @@ export const ProductDetailTopView: React.FC<ProductDetailTopViewProps> = ({ prod
             <div
                 role="dialog"
                 aria-modal="true"
-                aria-label={drawerMode === "buy" ? "Atur Jumlah Pembelian" : "Atur Jumlah Keranjang"}
+                aria-label={drawerMode === "buy" ? "Pilih Varian & Jumlah Pembelian" : "Pilih Varian & Keranjang"}
                 className={`fixed z-50 transition-all duration-300 ease-out 
                     /* Mobile: Bottom sheet */
-                    inset-x-0 bottom-0 max-h-[88vh] overflow-y-auto rounded-t-3xl border-t border-slate-200 bg-white p-5 shadow-2xl dark:border-white/10 dark:bg-slate-900
+                    inset-x-0 bottom-0 max-h-[90vh] overflow-y-auto rounded-t-3xl border-t border-slate-200 bg-white p-5 shadow-2xl dark:border-white/10 dark:bg-slate-900
                     /* Desktop: Floating popover di kanan bawah */
-                    sm:inset-x-auto sm:bottom-6 sm:right-6 sm:w-[420px] sm:rounded-3xl sm:border sm:border-slate-200 dark:sm:border-white/10 sm:p-6
+                    sm:inset-x-auto sm:bottom-6 sm:right-6 sm:w-[450px] sm:rounded-3xl sm:border sm:border-slate-200 dark:sm:border-white/10 sm:p-6
                     ${
                         isQuantityDrawerOpen
                             ? "translate-y-0 opacity-100 scale-100"
@@ -670,23 +763,35 @@ export const ProductDetailTopView: React.FC<ProductDetailTopViewProps> = ({ prod
                         <img
                             src={images[0]}
                             alt={product.name}
-                            className="h-16 w-16 shrink-0 rounded-xl border border-slate-200 object-cover object-center dark:border-white/10"
+                            className="h-16 w-16 shrink-0 rounded-2xl border border-slate-200 object-cover object-center shadow-sm dark:border-white/10"
                         />
-                        <div className="space-y-0.5">
-                            <span className="inline-block text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                        <div className="space-y-1">
+                            <span className="inline-block rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
                                 {drawerMode === "buy" ? "Beli Langsung" : "Tambah ke Keranjang"}
                             </span>
                             <h3 className="line-clamp-1 text-sm font-bold text-slate-900 dark:text-white">
                                 {product.name}
                             </h3>
-                            <div className="flex items-center gap-2">
-                                <span className="text-sm font-extrabold text-blue-600 dark:text-blue-400">
-                                    {formatRupiah(product.price)}
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-base font-black text-blue-600 dark:text-blue-400">
+                                    {formatRupiah(effectivePrice)}
                                 </span>
-                                <span className="text-[11px] text-slate-400">
-                                    Stok: <strong className="font-semibold text-slate-700 dark:text-slate-300">{maxStock}</strong>
-                                </span>
+                                {disc > 0 && (
+                                    <>
+                                        <span className="text-xs text-slate-400 line-through">
+                                            {formatRupiah(effectiveOriginalPrice)}
+                                        </span>
+                                        <span className="rounded bg-rose-100 px-1.5 py-0.2 text-[10px] font-bold text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">
+                                            Hemat {disc}%
+                                        </span>
+                                    </>
+                                )}
                             </div>
+                            {selectedVariantsSummary && (
+                                <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[260px]">
+                                    Pilihan: <strong className="font-semibold text-blue-600 dark:text-blue-400">{selectedVariantsSummary}</strong>
+                                </p>
+                            )}
                         </div>
                     </div>
 
@@ -700,29 +805,136 @@ export const ProductDetailTopView: React.FC<ProductDetailTopViewProps> = ({ prod
                     </button>
                 </div>
 
-                {/* Section: Atur Jumlah Barang (Stepper & Shortcut Pills) */}
-                <div className="py-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <span className="text-xs font-bold text-slate-900 dark:text-white">
-                                Jumlah Barang
+                {/* SECTION 1: PILIHAN VARIAN PEMBELIAN (WARNA, UKURAN, TIPE/EDISI, DLL) */}
+                {variantGroups.length > 0 ? (
+                    <div className="space-y-4 border-b border-slate-100 py-4 dark:border-white/5">
+                        {variantGroups.map((group) => {
+                            const currentSelectedId = selectedVariants[group.id];
+                            const currentSelectedOption = group.options.find((o) => o.id === currentSelectedId);
+
+                            return (
+                                <div key={group.id} className="space-y-2">
+                                    {/* Header Group: Nama Varian & Status Terpilih */}
+                                    <div className="flex items-center justify-between text-xs">
+                                        <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
+                                            <span>{group.name}</span>
+                                            <span className="text-[10px] font-normal text-slate-400">({group.options.length} opsi)</span>
+                                        </div>
+                                        {currentSelectedOption && (
+                                            <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                                                Dipilih: <strong className="font-semibold text-blue-600 dark:text-blue-400">{currentSelectedOption.label}</strong>
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {/* Pilihan Tombol Opsi Varian */}
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        {group.options.map((option) => {
+                                            const isSelected = currentSelectedId === option.id;
+
+                                            return (
+                                                <button
+                                                    key={option.id}
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setSelectedVariants((prev) => ({
+                                                            ...prev,
+                                                            [group.id]: option.id,
+                                                        }))
+                                                    }
+                                                    className={`group relative flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs transition ${
+                                                        isSelected
+                                                            ? "border-2 border-blue-600 bg-blue-50/80 font-bold text-blue-700 shadow-sm ring-2 ring-blue-500/20 dark:border-blue-400 dark:bg-blue-950/50 dark:text-blue-300"
+                                                            : "border border-slate-200 bg-white font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-white/10 dark:bg-slate-800/80 dark:text-slate-300 dark:hover:bg-slate-800"
+                                                    }`}
+                                                >
+                                                    {/* Color Dot Swatch if colorHex is defined */}
+                                                    {option.colorHex && (
+                                                        <span
+                                                            className="h-3.5 w-3.5 rounded-full border border-black/15 shadow-inner shrink-0"
+                                                            style={{ backgroundColor: option.colorHex }}
+                                                            aria-hidden="true"
+                                                        />
+                                                    )}
+
+                                                    <span>{option.label}</span>
+
+                                                    {/* Price Delta Badge if this option costs extra */}
+                                                    {option.priceDelta && option.priceDelta > 0 && (
+                                                        <span
+                                                            className={`rounded-md px-1.5 py-0.2 text-[10px] font-bold ${
+                                                                isSelected
+                                                                    ? "bg-blue-200/70 text-blue-900 dark:bg-blue-900/60 dark:text-blue-200"
+                                                                    : "bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300"
+                                                            }`}
+                                                        >
+                                                            +{formatRupiah(option.priceDelta)}
+                                                        </span>
+                                                    )}
+
+                                                    {/* Active check icon */}
+                                                    {isSelected && (
+                                                        <CheckIcon size={13} strokeWidth={3} className="text-blue-600 dark:text-blue-400" />
+                                                    )}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                ) : (
+                    /* Tampilan Informasi Bila Toko Hanya Menjual 1 Pilihan / Tidak Ada Varian Tambahan */
+                    <div className="border-b border-slate-100 py-3.5 dark:border-white/5">
+                        <div className="flex items-start gap-2.5 rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-3.5 dark:border-white/10 dark:bg-white/5">
+                            <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
+                                <PackageIcon size={14} />
                             </span>
-                            <p className="text-[11px] text-slate-400">
-                                Sesuaikan banyak produk yang ingin Anda pesan
+                            <div className="space-y-0.5">
+                                <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                                    Varian Standar (1 Pilihan)
+                                </h4>
+                                <p className="text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+                                    Toko menjual produk ini dalam 1 jenis spesifikasi resmi standar tanpa opsi warna atau ukuran tambahan.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* SECTION 2: ATUR JUMLAH BARANG (MANUAL STEPPER ERGONOMIS) */}
+                <div className="py-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3.5 rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+                        <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-slate-900 dark:text-white">
+                                    Jumlah Pembelian
+                                </span>
+                                {quantity >= maxStock && (
+                                    <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
+                                        Maksimal Stok
+                                    </span>
+                                )}
+                            </div>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                Stok tersedia: <strong className="font-semibold text-slate-700 dark:text-slate-200">{maxStock} barang</strong>
                             </p>
                         </div>
 
-                        {/* Interactive Quantity Stepper */}
-                        <div className="flex items-center rounded-2xl border border-slate-200 bg-slate-50 p-1 dark:border-white/10 dark:bg-white/5">
+                        {/* Ergonomic Manual Stepper: - [Input] + */}
+                        <div className="flex items-center self-start sm:self-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-slate-800">
                             <button
                                 type="button"
                                 disabled={quantity <= 1}
                                 onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                                className="flex h-8 w-8 items-center justify-center rounded-xl bg-white text-slate-700 shadow-sm transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                                className="flex h-9 w-9 items-center justify-center text-slate-600 transition hover:bg-slate-100 active:scale-95 disabled:cursor-not-allowed disabled:opacity-30 dark:text-slate-300 dark:hover:bg-white/10"
                                 title="Kurangi 1"
+                                aria-label="Kurangi jumlah barang"
                             >
-                                <MinusIcon size={14} />
+                                <MinusIcon size={15} />
                             </button>
+                            <div className="h-5 w-px bg-slate-200 dark:bg-white/10" />
                             <input
                                 type="number"
                                 min={1}
@@ -733,93 +945,55 @@ export const ProductDetailTopView: React.FC<ProductDetailTopViewProps> = ({ prod
                                     if (isNaN(val)) setQuantity(1);
                                     else setQuantity(Math.max(1, Math.min(maxStock, val)));
                                 }}
-                                className="w-12 text-center text-sm font-black text-slate-900 bg-transparent focus:outline-none dark:text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                className="w-14 text-center text-sm font-black text-slate-900 bg-transparent focus:outline-none dark:text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                aria-label="Ketik jumlah pesanan secara manual"
                             />
+                            <div className="h-5 w-px bg-slate-200 dark:bg-white/10" />
                             <button
                                 type="button"
                                 disabled={quantity >= maxStock}
                                 onClick={() => setQuantity((q) => Math.min(maxStock, q + 1))}
-                                className="flex h-8 w-8 items-center justify-center rounded-xl bg-white text-slate-700 shadow-sm transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                                className="flex h-9 w-9 items-center justify-center text-slate-600 transition hover:bg-slate-100 active:scale-95 disabled:cursor-not-allowed disabled:opacity-30 dark:text-slate-300 dark:hover:bg-white/10"
                                 title="Tambah 1"
+                                aria-label="Tambah jumlah barang"
                             >
-                                <PlusIcon size={14} />
+                                <PlusIcon size={15} />
                             </button>
                         </div>
-                    </div>
-
-                    {/* Quick Preset Shortcut Pills (+1, +2, +5, +10, Maksimal) */}
-                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                        <span className="text-[11px] text-slate-400 pr-1">Pilihan Cepat:</span>
-                        {[1, 2, 5, 10].map((preset) => {
-                            if (preset > maxStock) return null;
-                            const isSelected = quantity === preset;
-                            return (
-                                <button
-                                    key={preset}
-                                    type="button"
-                                    onClick={() => setQuantity(preset)}
-                                    className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
-                                        isSelected
-                                            ? "bg-blue-600 text-white shadow-sm"
-                                            : "border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
-                                    }`}
-                                >
-                                    {preset}
-                                </button>
-                            );
-                        })}
-                        <button
-                            type="button"
-                            onClick={() => setQuantity(maxStock)}
-                            className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
-                                quantity === maxStock
-                                    ? "bg-blue-600 text-white shadow-sm"
-                                    : "border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
-                            }`}
-                        >
-                            Maks ({maxStock})
-                        </button>
-                    </div>
-
-                    {/* Catatan untuk Penjual (Opsional) */}
-                    <div className="pt-2">
-                        <label className="mb-1 block text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                            Catatan untuk Penjual (Opsional)
-                        </label>
-                        <input
-                            type="text"
-                            value={orderNote}
-                            onChange={(e) => setOrderNote(e.target.value)}
-                            placeholder="Contoh: warna hitam, ukuran L, packing bubble wrap"
-                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 placeholder-slate-400 transition focus:border-blue-500 focus:bg-white focus:outline-none dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:placeholder-slate-500 dark:focus:border-blue-400"
-                        />
                     </div>
                 </div>
 
                 {/* Subtotal & Rincian Ringkas */}
-                <div className="border-t border-slate-100 pt-3 dark:border-white/5">
-                    <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
+                <div className="border-t border-slate-100 pt-3.5 dark:border-white/5">
+                    <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-1.5">
                         <span>Subtotal ({quantity} barang)</span>
-                        <span>{formatRupiah(product.price * quantity)}</span>
+                        <span>{formatRupiah(effectivePrice * quantity)}</span>
                     </div>
                     {disc > 0 && (
-                        <div className="flex items-center justify-between text-xs text-rose-600 dark:text-rose-400 font-semibold mb-1">
+                        <div className="flex items-center justify-between text-xs text-rose-600 dark:text-rose-400 font-semibold mb-1.5">
                             <span>Hemat Diskon</span>
-                            <span>- {formatRupiah((product.originalPrice - product.price) * quantity)}</span>
+                            <span>- {formatRupiah((effectiveOriginalPrice - effectivePrice) * quantity)}</span>
                         </div>
                     )}
                     <div className="flex items-center justify-between pt-1">
-                        <span className="text-xs font-bold text-slate-900 dark:text-white">
-                            Total Pembayaran
-                        </span>
-                        <span className="text-lg font-black text-blue-600 dark:text-blue-400">
-                            {formatRupiah(product.price * quantity)}
+                        <div>
+                            <span className="text-xs font-bold text-slate-900 dark:text-white">
+                                Total Pembayaran
+                            </span>
+                            {selectedVariantsSummary && (
+                                <p className="text-[10px] text-slate-400 truncate max-w-[200px]">
+                                    {selectedVariantsSummary}
+                                </p>
+                            )}
+                        </div>
+                        <span className="text-xl font-black text-blue-600 dark:text-blue-400">
+                            {formatRupiah(effectivePrice * quantity)}
                         </span>
                     </div>
                 </div>
 
                 {/* Action Buttons: Konfirmasi vs Batal */}
-                <div className="mt-4 flex items-center gap-2">
+                <div className="mt-4 flex items-center gap-2.5">
                     <button
                         type="button"
                         onClick={closeQuantityDrawer}
