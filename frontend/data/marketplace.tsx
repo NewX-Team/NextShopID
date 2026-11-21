@@ -1163,3 +1163,47 @@ export function getStoreProducts(storeSlugOrName: string): MarketplaceProduct[] 
 
     return ALL_PRODUCTS.slice(0, 6);
 }
+
+// ---------------------------------------------------------------------------
+// Catalog Helpers & Definitions
+// ---------------------------------------------------------------------------
+
+export const CATALOG_CATEGORIES = [
+    { id: "all", name: "Semua Kategori" },
+    { id: "elektronik", name: "Elektronik & Gadget" },
+    { id: "fashion", name: "Fashion & Pakaian" },
+    { id: "rumah", name: "Kebutuhan Rumah" },
+    { id: "kecantikan", name: "Kecantikan & Perawatan" },
+    { id: "makanan", name: "Makanan & Minuman" },
+    { id: "otomotif", name: "Otomotif" },
+] as const;
+
+export function normalizeCategory(category: string): string {
+    const c = category.toLowerCase();
+    if (c.includes("elektronik") || c.includes("gadget") || c.includes("smart living")) return "elektronik";
+    if (c.includes("fashion") || c.includes("pakaian") || c.includes("apparel") || c.includes("flanel")) return "fashion";
+    if (c.includes("rumah") || c.includes("dapur") || c.includes("linen")) return "rumah";
+    if (c.includes("cantik") || c.includes("beauty") || c.includes("skin") || c.includes("care")) return "kecantikan";
+    if (c.includes("makan") || c.includes("kopi") || c.includes("sembako")) return "makanan";
+    if (c.includes("otomotif") || c.includes("motor") || c.includes("mobil")) return "otomotif";
+    return "lainnya";
+}
+
+export const CATALOG_LOCATIONS = [
+    "Semua Kota",
+    "Jabodetabek",
+    "Jakarta Barat",
+    "Jakarta Utara",
+    "Jakarta Pusat",
+    "Bandung",
+    "Surakarta",
+    "Surabaya",
+] as const;
+
+export const PRICE_PRESETS = [
+    { label: "< Rp50.000", min: 0, max: 50000 },
+    { label: "Rp50.000 - Rp150.000", min: 50000, max: 150000 },
+    { label: "Rp150.000 - Rp300.000", min: 150000, max: 300000 },
+    { label: "> Rp300.000", min: 300000, max: 0 },
+] as const;
+

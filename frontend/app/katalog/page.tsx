@@ -1,16 +1,17 @@
 import type { Metadata } from "next";
+import { CatalogView } from "@/components/catalog/CatalogView";
+import { ALL_PRODUCTS } from "@/data/marketplace";
 
 export const metadata: Metadata = {
-  title: "Katalog - NextShopID",
-  description: "Katalog produk NextShopID",
+  title: "Katalog Produk - NextShopID",
+  description:
+    "Jelajahi ribuan produk terbaik dari toko resmi dan penjual terverifikasi di NextShopID.",
 };
 
 export default function KatalogPage() {
   return (
-    <main className="flex flex-1 items-center justify-center px-4 py-20 bg-white dark:bg-[#0b0f19] transition-colors duration-200">
-      <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white sm:text-3xl transition-colors duration-200">
-        ini katalog page
-      </h1>
+    <main className="min-h-screen bg-slate-50/50 dark:bg-[#070b14] transition-colors duration-200">
+      <CatalogView initialProducts={ALL_PRODUCTS} />
     </main>
   );
 }
