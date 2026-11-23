@@ -845,7 +845,7 @@ export const BuyerHome: React.FC = () => {
                                 key={banner.id}
                                 href={banner.href}
                                 className="group relative flex min-h-[140px] flex-col justify-end overflow-hidden rounded-3xl p-5 text-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
-                            >
+                            > 
                                 <img
                                     src={banner.image}
                                     alt={banner.title}
