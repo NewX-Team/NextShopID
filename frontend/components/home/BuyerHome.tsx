@@ -836,7 +836,7 @@ export const BuyerHome: React.FC = () => {
                         >
                             <ArrowRightIcon size={18} />
                         </button>
-                    </div>
+                    </div> 
  
                     {/* Side Clean Photo Cards */}
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
